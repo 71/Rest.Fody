@@ -3,9 +3,20 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25123.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rest.Fody", "Rest.Fody\Rest.Fody.csproj", "{37C74D59-FE26-4634-8CB8-CBAC6CCAD906}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rest.Fody.Portable", "Rest.Fody.Portable\Rest.Fody.Portable.csproj", "{37C74D59-FE26-4634-8CB8-CBAC6CCAD906}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rest.Fody.Tests", "Rest.Fody.Tests\Rest.Fody.Tests.csproj", "{DDCF6781-AB26-4CA6-AC07-FB2B866220B2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rest.Fody", "Rest.Fody\Rest.Fody.csproj", "{042A408A-2A95-4218-994C-180D2C78CA07}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Shared", "Shared\Shared.shproj", "{1F6702C8-1C32-4E6F-B224-DA29B9A619FA}"
 EndProject
 Global
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		Shared\Shared.projitems*{1f6702c8-1c32-4e6f-b224-da29b9a619fa}*SharedItemsImports = 13
+		Shared\Shared.projitems*{37c74d59-fe26-4634-8cb8-cbac6ccad906}*SharedItemsImports = 4
+		Shared\Shared.projitems*{042a408a-2a95-4218-994c-180d2c78ca07}*SharedItemsImports = 4
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
@@ -15,6 +26,14 @@ Global
 		{37C74D59-FE26-4634-8CB8-CBAC6CCAD906}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{37C74D59-FE26-4634-8CB8-CBAC6CCAD906}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{37C74D59-FE26-4634-8CB8-CBAC6CCAD906}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DDCF6781-AB26-4CA6-AC07-FB2B866220B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DDCF6781-AB26-4CA6-AC07-FB2B866220B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DDCF6781-AB26-4CA6-AC07-FB2B866220B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DDCF6781-AB26-4CA6-AC07-FB2B866220B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{042A408A-2A95-4218-994C-180D2C78CA07}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{042A408A-2A95-4218-994C-180D2C78CA07}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{042A408A-2A95-4218-994C-180D2C78CA07}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{042A408A-2A95-4218-994C-180D2C78CA07}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

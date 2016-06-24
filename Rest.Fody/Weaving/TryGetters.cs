@@ -6,44 +6,40 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Mono.Cecil;
+using Rest.Fody.Weaving;
 
 namespace Rest.Fody
 {
     public sealed partial class ModuleWeaver
     {
-        private TypeReference Ref<T>()
+        private bool TryGetServiceAttr(TypeDefinition t, out Uri uri)
         {
-            Type t = typeof(T);
-            return new TypeReference(t.Namespace, t.Name, ModuleDefinition, Scope);
-        }
-
-        private bool TryGetServiceForAttr(TypeDefinition t, out ServiceForAttribute attr, out Uri uri)
-        {
-            attr = null;
             uri = null;
 
-            CustomAttribute a = t.CustomAttributes
-                .FirstOrDefault(x => x.AttributeType == Ref<ServiceForAttribute>());
-
-            if (a == null)
+            if (t.Name == "<Module>")
                 return false;
 
-            string addr = a.Properties.First(x => x.Name == ADDRESS).Argument.Value as string;
+            CustomAttribute a = t.GetAttr<ServiceForAttribute>();
 
-            if (addr == null) // no address: expect provided HttpClient
+            if (a == null)
             {
-                uri = null;
-                attr = new ServiceForAttribute(addr);
+                a = t.GetAttr<ServiceAttribute>();
+
+                if (a == null)
+                    return false;
+                
                 return true;
             }
-            else if (addr != null && Uri.TryCreate(addr, UriKind.Absolute, out uri)) // address provided
+
+            string addr = a.ConstructorArguments[0].Value as string;
+
+            if (addr != null && Uri.TryCreate(addr, UriKind.Absolute, out uri)) // address provided
             {
-                attr = new ServiceForAttribute(addr);
                 return true;
             }
             else // address provided, but invalid
             {
-                throw Ex(ThrowReason.InvalidAddress);
+                throw Ex(ThrowReason.InvalidAddress, addr);
             }
         }
 
@@ -51,28 +47,26 @@ namespace Rest.Fody
         {
             getter = null;
             PropertyDefinition p = (from prop in t.Properties
-                                    let attr = prop.CustomAttributes.FirstOrDefault(x => x.AttributeType == Ref<RestClientAttribute>())
+                                    let attr = prop.GetAttr<RestClientAttribute>()
                                     where attr != null
                                     select prop).FirstOrDefault();
 
             if (p == null)
                 return false;
 
-            if (p.PropertyType != Ref<HttpClient>())
+            if (!p.PropertyType.Is<HttpClient>())
                 throw Ex(ThrowReason.InvalidRestClientAttrValue);
 
             getter = p.GetMethod;
             return true;
         }
 
-        private bool IsValidHttpMethod(MethodDefinition m, out HttpMethod httpmethod, out string path)
+        private bool IsValidHttpMethod(MethodDefinition m, out string path, out MethodReference httpMethodGetter)
         {
-            httpmethod = null;
             path = null;
+            httpMethodGetter = null;
 
-            TypeReference @ref = Ref<HttpMethodAttribute>();
-            CustomAttribute a = m.CustomAttributes
-                .FirstOrDefault(x => x.AttributeType == @ref || x.AttributeType.DeclaringType == @ref);
+            CustomAttribute a = m.GetAttr<HttpMethodAttribute>();
 
             if (a == null)
                 return false;
@@ -80,11 +74,15 @@ namespace Rest.Fody
             if (m.RVA != 0) // not extern
                 throw Ex(ThrowReason.ExpectExternMethod);
 
-            httpmethod = a.Properties.First(x => x.Name == HTTP_METHOD).Argument.Value as HttpMethod;
-            path = a.Fields.First(x => x.Name == PATH).Argument.Value as string;
+            var prop = a.AttributeType.Resolve().Properties.First(x => x.Name == "Method");
+            httpMethodGetter = ModuleDefinition.Import(prop.GetMethod);
 
-            if (httpmethod == null)
-                throw Ex(ThrowReason.InvalidHttpMethod);
+            path = a.HasConstructorArguments
+                ? a.ConstructorArguments[0].Value as string
+                : null;
+
+            if (path == null)
+                throw Ex(ThrowReason.Null, "HttpMethodAttribute");
 
             return true;
         }

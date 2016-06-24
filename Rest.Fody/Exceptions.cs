@@ -29,7 +29,7 @@ namespace Rest.Fody
             {
                  switch (r)
                  {
-                    case ThrowReason.InvalidAddress: return "Invalid address given to [ServiceFor] attribute.";
+                    case ThrowReason.InvalidAddress: return "Invalid address given to [ServiceFor] attribute: {0}.";
                     case ThrowReason.InvalidRestClientAttrValue: return "Attribute [RestClient] expects an HttpClient for value.";
                     case ThrowReason.NoClientNorAddress: return "No HttpClient was specified using [RestClient], and no address was given to [ServiceFor].";
                     case ThrowReason.ExpectExternMethod: return "Expected extern method.";
@@ -39,8 +39,12 @@ namespace Rest.Fody
                  }
             })();
 
-            err = String.Format(err, args);
-            this.LogError(err);
+            return Ex(String.Format(err, args));
+        }
+
+        public Exception Ex(string err)
+        {
+            //this.LogError(err);
             return new WeavingException(err);
         }
     }
