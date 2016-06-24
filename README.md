@@ -17,20 +17,17 @@ public class API
 
 ## Source structure
 
-### Attributes.cs
-#### Namespace: `Rest`
-Attributes usable in the user's code.
+### Rest.Fody
+All the weaving code.
 
-### Constants.cs
-#### Namespace: `Rest.Fody`
-Constants, such as type & property names.
+### Rest.Fody.Portable
+All the attributes.
 
-### ModuleWeavers.cs
-#### Namespace: `Rest.Fody`
-The entry point of the weaver. Defines basic methods.
+### Rest.Fody.Tests
+Some random tests ; TODO.
 
-### Weaving/Middleware.cs
-#### Namespace: `Rest.Fody`
+### Shared
+Code shared between Rest.Fody.Portable and Rest.Fody.
 
 ## API
 
