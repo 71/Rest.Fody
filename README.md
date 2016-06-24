@@ -35,7 +35,7 @@ The entry point of the weaver. Defines basic methods.
 ## API
 
 ### Basic anatomy of a class
-```
+```csharp
 [ServiceFor("http://example.com/api/v1")]
 public class API
 {
@@ -56,7 +56,7 @@ With the `[ServiceFor(URL)]` attribute, it is also possible to specify custom he
 `[Header(name, value)]` attribute.
 
 ### Making requests
-```
+```csharp
 [Get("/")]
 public extern Task CheckInternetConnection();
 ```
@@ -71,7 +71,7 @@ To add your own (de)serialization, declare one of those methods in a static clas
 - `T Deserialize<T>(string src)` *or* `T Deserialize<T>(byte[] bytes)`
 
 ### Query, dynamic url
-```
+```csharp
 [Get("/todo")]
 public extern Task<List<Todo>> GetTodos([Query] int offset, [Query] int count);
 
@@ -92,14 +92,14 @@ Two ways to change a dynamic url:
 - `[Alias(name)] string id`
 
 ### Body
-```
+```csharp
 [Put("/todo/{todoId}")]
 public extern Task<Todo> UpdateTodo(string todoId, [Body] Todo todo);
 ```
 The body of the request must be **unique**, and marked with the `[Body]` attribute.
 
 ### Headers
-```
+```csharp
 [ServiceFor("http://example.com/api/v1")]
 [Header("Authorization", "Bearer xxx")]
 public class API
