@@ -31,21 +31,11 @@ namespace Rest.Fody
         // An instance of Mono.Cecil.ModuleDefinition for processing.
         public ModuleDefinition ModuleDefinition { get; set; }
 
-        private AssemblyDefinition Http;
-        private AssemblyDefinition Core;
-
         // An instance of Mono.Cecil.IAssemblyResolver for resolving assembly references.
         public IAssemblyResolver AssemblyResolver { get; set; }
 
         public Assembly Assembly { get; set; }
         public AssemblyName Name { get; set; }
-
-        public void DEBUG(string format, params object[] args)
-        {
-#if DEBUG
-            LogInfo(args == null || args.Length == 0 ? format : String.Format(format, args));
-#endif
-        }
 
         public ModuleWeaver()
         {
@@ -55,7 +45,8 @@ namespace Rest.Fody
 
         public void AfterWeaving()
         {
-            DEBUG("Write successful!");
+            Logger.Log("Weaving successful!");
+            Logger.Log($"Changed {ModifiedTypes} classes, and created {ModifiedMethods} methods.", true);
         }
 
         private static IEnumerable<TypeDefinition> GetAllTypes(IEnumerable<TypeDefinition> types)
@@ -69,84 +60,9 @@ namespace Rest.Fody
             }
         }
 
-        private TypeReference HttpRequestMessageRef;
-        private TypeReference HttpClientRef;
-        private TypeReference HttpHeadersRef;
-        private TypeReference UriRef;
-        private TypeReference HttpMethodRef;
-
-        private MethodReference HttpClient_Ctor;
-        private MethodReference Uri_Ctor;
-        private MethodReference HttpRequestMessage_Ctor;
-
-        private MethodReference BaseAddress_Set;
-        private MethodReference DefaultHeaders_Get;
-        private MethodReference Method_Get;
-
-        private MethodReference HttpHeaders_Add;
-        private MethodReference HttpClient_SendAsync;
-
         private Logger Logger;
         private int ModifiedTypes = 0;
         private int ModifiedMethods = 0;
-
-
-        private void Import()
-        {
-            Logger.Log("Resolving scopes.", false);
-            Http = AssemblyResolver.Resolve("System.Net.Http");
-            Core = AssemblyResolver.Resolve("System");
-            if (Http == null || Core == null)
-                throw new WeavingException("Couldn't find System.Net.Http and/or System. Aborting.");
-
-
-            Logger.Log("Importing references.", false);
-            HttpClientRef = ModuleDefinition.ImportType<HttpClient>(Http.MainModule);
-            HttpRequestMessageRef = ModuleDefinition.ImportType<HttpRequestMessage>(Http.MainModule);
-            HttpHeadersRef = ModuleDefinition.ImportType<HttpHeaders>(Http.MainModule);
-            HttpMethodRef = ModuleDefinition.ImportType<HttpMethod>(Http.MainModule);
-            UriRef = ModuleDefinition.ImportType<Uri>(Core.MainModule);
-            
-
-            Logger.Log("Importing constructors.", false);
-            HttpClient_Ctor = ModuleDefinition.ImportCtor<HttpClient>();
-            HttpRequestMessage_Ctor = ModuleDefinition.ImportCtor<HttpRequestMessage>(typeof(HttpMethod), typeof(string));
-            Uri_Ctor = ModuleDefinition.ImportCtor<Uri>(typeof(string));
-
-
-            Logger.Log("Importing properties.", false);
-            BaseAddress_Set = ModuleDefinition.ImportSetter<HttpClient, Uri>(x => x.BaseAddress);
-            DefaultHeaders_Get = ModuleDefinition.ImportGetter<HttpClient, HttpRequestHeaders>(x => x.DefaultRequestHeaders);
-            Method_Get = ModuleDefinition.ImportGetter<HttpMethod, string>(x => x.Method);
-
-
-            Logger.Log("Importing methods.", false);
-            HttpHeaders_Add = ModuleDefinition.ImportMethod<HttpHeaders>("Add", typeof(string), typeof(string));
-            HttpClient_SendAsync = ModuleDefinition.ImportMethod<HttpClient>("SendAsync", typeof(HttpRequestMessage));
-        }
-
-        public void ExecuteTest()
-        {
-            Logger = new Logger(LogDebug, LogInfo);
-            Import();
-
-            // IMPORTING VIA MSCORLIB: NOT WORKING.
-            //var mscorlib = ModuleDefinition.AssemblyReferences.First(x => x.Name == "mscorlib");
-            //
-            //var httpClient = new TypeReference("System.Net.Http", "HttpClient", ModuleDefinition, mscorlib);
-            //httpClient = ModuleDefinition.Import(httpClient);
-
-            // IMPORTING VIA ASSEMBLY RESOLVER:
-            var net = AssemblyResolver.Resolve("System.Net.Http");
-            var httpClient = new TypeReference("System.Net.Http", "HttpClient", ModuleDefinition, Http.MainModule);
-            Logger.Log(typeof(HttpClient).Namespace + '.' + typeof(HttpClient).Name);
-
-            TypeDefinition type = ModuleDefinition.Types.First(x => x.Name == "GoodClient");
-            var fld = new FieldDefinition("Something", Mono.Cecil.FieldAttributes.Private, HttpClientRef);
-            type.Fields.Add(fld);
-
-            //throw new WeavingException("Shutdown test build");
-        }
 
         // * Scan types for a [Service] or [ServiceFor] attribute
         // * Scan type for a [RestClient] marked HttpClient
@@ -178,6 +94,15 @@ namespace Rest.Fody
                     {
                         Logger.Log($"Processing type: {t.Name}");
 
+                        // if we have no mean of deserializing / serializing, try to find one
+                        MethodDefinition
+                            serStr = SerializeStr,
+                            serBuf = SerializeBuf,
+                            deserStr = DeserializeStr,
+                            deserBuf = DeserializeBuf;
+
+                        FindDeserializeMethods(t.Methods.Where(x => !x.IsStatic), out serStr, out serBuf, out deserStr, out deserBuf);
+
                         // valid type, try to find a client
                         MethodDefinition httpClientGetter = null;
 
@@ -195,7 +120,7 @@ namespace Rest.Fody
                                 string[] header = a.ConstructorArguments.Select(x => x.Value as string).ToArray();
 
                                 if (header == null)
-                                    throw Ex(ThrowReason.Null, "Type Header");
+                                    throw WeavingException.AttrValuesCannotBeNull;
                                 else
                                     headers.Enqueue(header);
                             }
@@ -204,7 +129,7 @@ namespace Rest.Fody
                         }
                         else // no http client & no base address
                         {
-                            throw Ex(ThrowReason.NoClientNorAddress);
+                            throw new WeavingException("No base address was given, and no HttpClient marked [RestClient] could be found.");
                         }
 
                         Logger.Log($"Adding methods for type {t.Name}", false);
@@ -216,18 +141,7 @@ namespace Rest.Fody
                         {
                             Logger.Log($"Creating method: {t.Name}.{method.Name}");
 
-                            Queue<string[]> headers = new Queue<string[]>();
-                            foreach (CustomAttribute a in method.GetAttrs<HeaderAttribute>())
-                            {
-                                string[] header = a.ConstructorArguments.Select(x => x.Value as string).ToArray();
-
-                                if (header == null)
-                                    throw Ex(ThrowReason.Null, "Method [HeaderAttribute]");
-                                else
-                                    headers.Enqueue(header);
-                            }
-
-                            Logger.Log("GENERATING METHOD", () => AddRestClientMethod(httpClientGetter, method, httpMethodGetter, relativePath, headers));
+                            Logger.Log("GENERATING METHOD", () => AddRestClientMethod(httpClientGetter, method, httpMethodGetter, relativePath, serStr, serBuf, deserStr, deserBuf));
 
                             ModifiedMethods++;
                             Logger.Log($"Done creating extern method {t.Name}.{method.Name}.");

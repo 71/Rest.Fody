@@ -58,9 +58,9 @@ namespace Rest.Fody
                         instructions.Add(Instruction.Create(OpCodes.Callvirt, DefaultHeaders_Get));
 
                         if (header.Length != 2)
-                            throw Ex("Attributes [Header] on class must have two args in their constructor.");
+                            throw new WeavingException("Attributes [Header] on class must have two args in their constructor.");
                         else if (header.Any(x => String.IsNullOrWhiteSpace(x)))
-                            throw Ex("Attributes [Header] on class must have two non-null args in their constructor.");
+                            throw new WeavingException("Attributes [Header] on class must have two non-null args in their constructor.");
 
                         instructions.Add(Instruction.Create(OpCodes.Ldstr, header[0]));          // push header name to stack
                         instructions.Add(Instruction.Create(OpCodes.Ldstr, header[1]));          // push header value to stack
@@ -78,20 +78,164 @@ namespace Rest.Fody
             }));
         }
 
-        private void AddRestClientMethod(MethodDefinition httpClientGetter, MethodDefinition method, MethodReference httpMethodGetter, string path, IEnumerable<string[]> headers)
+        private void AddRestClientMethod(MethodDefinition httpClientGetter, MethodDefinition method, MethodReference httpMethodGetter, string path,
+            MethodDefinition serStr, MethodDefinition serBuf,
+            MethodDefinition deserStr, MethodDefinition deserBuf)
         {
+            Logger.Log($"Generating new method {method.Name}", false);
+            
             method.Body.Emit(il =>
             {
-                il.Emit(OpCodes.Ldarg_0);               // this
-                il.Emit(OpCodes.Call, httpClientGetter);// load this.HttpClient onto the stack
+                il.Emit(OpCodes.Ldarg_0);                   // this
+                il.Emit(OpCodes.Call, httpClientGetter);    // load this.HttpClient onto the stack
                 
-                il.Emit(OpCodes.Call, httpMethodGetter);            // load the static Method property of the attribute
-                il.Emit(OpCodes.Ldstr, path);                       // load path onto the stack
-                il.Emit(OpCodes.Newobj, HttpRequestMessage_Ctor);   // load new HttpRequestMessage()
-                
+                il.Emit(OpCodes.Call, httpMethodGetter);// load the static Method property of the attribute
+                il.Emit(OpCodes.Ldstr, path);           // load path onto the stack
+                il.Emit(OpCodes.Newobj, Proxy_Ctor);    // create proxy
+
+                // add headers
+                foreach (var attr in method.GetAttrs<HeaderAttribute>())
+                {
+                    if (attr.ConstructorArguments.Count == 2)
+                    {
+                        if (attr.ConstructorArguments.Any(x => x.Value == null))
+                            throw WeavingException.AttrValuesCannotBeNull;
+
+                        il.Emit(OpCodes.Ldstr, (string)attr.ConstructorArguments[0].Value);
+                        il.Emit(OpCodes.Ldstr, (string)attr.ConstructorArguments[1].Value);
+                        il.Emit(OpCodes.Callvirt, Proxy_AddHeader);
+                    }
+                    else
+                        throw WeavingException.AttrValuesOutOfRange(2, "Method");
+                }
+
+                if (method.HasParameters)
+                    RunMethodParameters(method, il, serStr, serBuf, deserStr, deserBuf);
+
+                il.Emit(OpCodes.Callvirt, Proxy_Compile);           // compile proxy to HttpRequestMessage
                 il.Emit(OpCodes.Callvirt, HttpClient_SendAsync);    // this.HttpClient.SendAsync()
                 il.Emit(OpCodes.Ret);                               // return result of SendAsync()
             });
+        }
+
+        private void RunMethodParameters(MethodDefinition m, ILProcessor il,
+            MethodDefinition serStr, MethodDefinition serBuf,
+            MethodDefinition deserStr, MethodDefinition deserBuf)
+        {
+            foreach (ParameterDefinition p in m.Parameters)
+            {
+                byte i = (byte)(p.Index + 1);
+
+                CustomAttribute body = p.GetAttr<BodyAttribute>();
+                if (body != null)
+                {
+                    if (p.ParameterType.Is<string>())
+                    {
+                        il.Emit(OpCodes.Ldarg_S, i);
+                        il.Emit(OpCodes.Callvirt, Proxy_AddBodyStr);
+                    }
+                    else
+                    {
+                        if (serStr != null)
+                        {
+                            if (serStr.IsStatic)
+                            {
+                                il.Emit(OpCodes.Ldarg_S, i);
+                                il.Emit(OpCodes.Box, p.ParameterType);
+                                il.Emit(OpCodes.Call, serStr);
+                            }
+                            else
+                            {
+                                il.Emit(OpCodes.Ldarg_0);
+                                il.Emit(OpCodes.Ldarg_S, i);
+                                il.Emit(OpCodes.Box, p.ParameterType);
+                                il.Emit(OpCodes.Callvirt, serStr);
+                            }
+                            il.Emit(OpCodes.Callvirt, Proxy_AddBodyStr);
+                        }
+                        else if (serBuf != null)
+                        {
+                            if (serBuf.IsStatic)
+                            {
+                                il.Emit(OpCodes.Ldarg_S, i);
+                                il.Emit(OpCodes.Box, p.ParameterType);
+                                il.Emit(OpCodes.Call, serBuf);
+                            }
+                            else
+                            {
+                                il.Emit(OpCodes.Ldarg_0);
+                                il.Emit(OpCodes.Ldarg_S, i);
+                                il.Emit(OpCodes.Box, p.ParameterType);
+                                il.Emit(OpCodes.Callvirt, serBuf);
+                            }
+                            il.Emit(OpCodes.Callvirt, Proxy_AddBodyBuf);
+                        }
+                        else
+                            throw new WeavingException($"No serialization method specified by [{nameof(RestSerializerAttribute)}].");
+                    }
+
+                    continue;
+                }
+
+                CustomAttribute headers = p.GetAttr<HeadersAttribute>();
+                if (headers != null)
+                {
+                    if (!p.ParameterType.Is<IDictionary<string, object>>(true))
+                        throw new WeavingException($"Expected {nameof(IDictionary<string, object>)} but got {p.ParameterType}");
+
+                    il.Emit(OpCodes.Ldarg_S, i);
+                    il.Emit(OpCodes.Box, p.ParameterType);
+                    il.Emit(OpCodes.Callvirt, Proxy_AddHeaders);
+
+                    continue;
+                }
+
+                CustomAttribute header = p.GetAttr<HeaderAttribute>();
+                if (header != null)
+                {
+                    if (header.ConstructorArguments.Count != 1)
+                        throw WeavingException.AttrValuesOutOfRange(1, "Parameter");
+                    if (header.ConstructorArguments[0].Value == null)
+                        throw WeavingException.AttrValuesCannotBeNull;
+
+                    il.Emit(OpCodes.Ldstr, (string)header.ConstructorArguments[0].Value);
+                    il.Emit(OpCodes.Ldarg_S, i);
+                    il.Emit(OpCodes.Box, p.ParameterType);
+                    il.Emit(OpCodes.Callvirt, Proxy_AddHeader);
+
+                    continue;
+                }
+
+                CustomAttribute query = p.GetAttr<QueryAttribute>();
+                if (query != null)
+                {
+                    if (query.ConstructorArguments[0].Value == null)
+                        throw WeavingException.AttrValuesCannotBeNull;
+
+                    il.Emit(OpCodes.Ldstr, (string)query.ConstructorArguments[0].Value);
+                    il.Emit(OpCodes.Ldarg_S, i);
+                    il.Emit(OpCodes.Box, p.ParameterType);
+                    il.Emit(OpCodes.Callvirt, Proxy_AddQuery);
+
+                    continue;
+                }
+                
+                string argName = p.Name;
+
+                CustomAttribute alias = p.GetAttr<AliasAttribute>();
+                if (alias != null)
+                {
+                    if (alias.ConstructorArguments.Any(x => x.Value == null))
+                        throw WeavingException.AttrValuesCannotBeNull;
+
+                    argName = (string)alias.ConstructorArguments[0].Value;
+                }
+
+                il.Emit(OpCodes.Ldstr, argName);
+                il.Emit(OpCodes.Ldarg_S, i);
+                il.Emit(OpCodes.Box, p.ParameterType);
+                il.Emit(OpCodes.Callvirt, Proxy_AddPathArg);
+            }
         }
     }
 }

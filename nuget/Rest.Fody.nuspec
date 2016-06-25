@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>Rest.Fody</id>
+    <version>1.0.0</version>
+    <authors>aej</authors>
+    <owners>aej</owners>
+    <licenseUrl>http://www.opensource.org/licenses/mit-license.php</licenseUrl>
+    <projectUrl>https://github.com/0xG/Rest.Fody</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>A multi-platform REST client powered by Fody, and heavily inspired by paulcbetts's Refit and canton7's RestEase</description>
+    <releaseNotes>First release.</releaseNotes>
+    <copyright>Copyright © Gregoire GEIS 2016</copyright>
+    <tags>fody rest http</tags>
+    <dependencies>
+      <dependency id="Fody" version="1.0" />
+    </dependencies>
+  </metadata>
+</package>

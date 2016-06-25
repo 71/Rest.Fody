@@ -39,7 +39,7 @@ namespace Rest.Fody
             }
             else // address provided, but invalid
             {
-                throw Ex(ThrowReason.InvalidAddress, addr);
+                throw new WeavingException($"The base address provided for the type {t.Name} was invalid.");
             }
         }
 
@@ -55,7 +55,7 @@ namespace Rest.Fody
                 return false;
 
             if (!p.PropertyType.Is<HttpClient>())
-                throw Ex(ThrowReason.InvalidRestClientAttrValue);
+                throw new WeavingException("[RestClient] can only be set on HttpClient properties.");
 
             getter = p.GetMethod;
             return true;
@@ -72,7 +72,7 @@ namespace Rest.Fody
                 return false;
 
             if (m.RVA != 0) // not extern
-                throw Ex(ThrowReason.ExpectExternMethod);
+                throw new WeavingException($"Expected method {m.DeclaringType.Name}.{m.Name} to be extern.");
 
             var prop = a.AttributeType.Resolve().Properties.First(x => x.Name == "Method");
             httpMethodGetter = ModuleDefinition.Import(prop.GetMethod);
@@ -82,7 +82,7 @@ namespace Rest.Fody
                 : null;
 
             if (path == null)
-                throw Ex(ThrowReason.Null, "HttpMethodAttribute");
+                throw WeavingException.AttrValuesCannotBeNull;
 
             return true;
         }

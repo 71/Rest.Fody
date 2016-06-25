@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Rest.Fody.Tests
 {
@@ -14,11 +15,42 @@ namespace Rest.Fody.Tests
 
             GoodClient gc = new GoodClient();
 
-            gc.SayHey().ContinueWith(task =>
+            gc.Say().ContinueWith(task =>
             {
                 Console.WriteLine(task.Result);
+                Console.WriteLine(task.IsFaulted);
+            });
+
+            gc.SayMore("something", DateTime.Now).ContinueWith(task =>
+            {
+                Console.WriteLine(task.Result);
+                Console.WriteLine(task.IsFaulted);
             });
             Console.ReadKey();
+        }
+    }
+
+    [ServiceFor("http://hello.com/api/v1")]
+    [Header("Authorization", "Bearer Something")]
+    public class GoodClient
+    {
+        [Get("/hello/hey")]
+        public extern Task<string> SayHey();
+
+        [Get("/hello/{something}")]
+        [Header("Authorization", "Bearer Something else")]
+        public extern Task<string> Say(string something = "you");
+
+        [Post("/hello/{hey}")]
+        public extern Task<string> SayMore([Alias("hey")] string something, [Body] DateTime date);
+
+        [RestSerializer]
+        public string Serialize(object o)
+        {
+            if (o is DateTime)
+                return ((DateTime)o).ToLongDateString();
+            else
+                return o.ToString();
         }
     }
 }

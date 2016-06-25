@@ -57,11 +57,9 @@ namespace Rest.Fody.Weaving
 
 
         #region Import
-        public static TypeReference ImportType<T>(this ModuleDefinition module, IMetadataScope scope)
+        public static TypeReference ImportType<T>(this ModuleDefinition module)
         {
             return module.Import(typeof(T));
-            Type t = typeof(T);
-            return new TypeReference(t.Namespace, t.Name, module, scope);
         }
 
         public static MethodReference ImportMethod<T>(this ModuleDefinition module, string name, params Type[] paramTypes)
@@ -115,6 +113,11 @@ namespace Rest.Fody.Weaving
             return def.CustomAttributes.FirstOrDefault(x => x.AttributeType.Is<TAttr>(true));
         }
 
+        public static CustomAttribute GetAttr<TAttr>(this ParameterDefinition def) where TAttr : Attribute
+        {
+            return def.CustomAttributes.FirstOrDefault(x => x.AttributeType.Is<TAttr>(true));
+        }
+
         public static IEnumerable<CustomAttribute> GetAttrs<TAttr>(this MethodDefinition def) where TAttr : Attribute
         {
             return def.CustomAttributes.Where(x => x.AttributeType.Is<TAttr>(true));
@@ -131,6 +134,11 @@ namespace Rest.Fody.Weaving
         }
 
         public static IEnumerable<CustomAttribute> GetAttrs<TAttr>(this PropertyDefinition def) where TAttr : Attribute
+        {
+            return def.CustomAttributes.Where(x => x.AttributeType.Is<TAttr>(true));
+        }
+
+        public static IEnumerable<CustomAttribute> GetAttrs<TAttr>(this ParameterDefinition def) where TAttr : Attribute
         {
             return def.CustomAttributes.Where(x => x.AttributeType.Is<TAttr>(true));
         }

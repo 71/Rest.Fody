@@ -21,6 +21,7 @@ namespace Rest
     public class GetAttribute : HttpMethodAttribute
     {
         public static new HttpMethod Method { get { return HttpMethod.Get; } }
+
         public GetAttribute(string path) : base(path) { }
     }
 
@@ -28,6 +29,7 @@ namespace Rest
     public class PostAttribute : HttpMethodAttribute
     {
         public static new HttpMethod Method { get { return HttpMethod.Post; } }
+
         public PostAttribute(string path) : base(path) { }
     }
 
@@ -35,6 +37,7 @@ namespace Rest
     public class PutAttribute : HttpMethodAttribute
     {
         public static new HttpMethod Method { get { return HttpMethod.Put; } }
+
         public PutAttribute(string path) : base(path) { }
     }
 
@@ -42,6 +45,7 @@ namespace Rest
     public class DeleteAttribute : HttpMethodAttribute
     {
         public static new HttpMethod Method { get { return HttpMethod.Delete; } }
+
         public DeleteAttribute(string path) : base(path) { }
     }
 
@@ -49,6 +53,7 @@ namespace Rest
     public class PatchAttribute : HttpMethodAttribute
     {
         public static new HttpMethod Method { get { return new HttpMethod("Patch"); } }
+
         public PatchAttribute(string path) : base(path) { }
     }
 
@@ -56,6 +61,7 @@ namespace Rest
     public class HeadAttribute : HttpMethodAttribute
     {
         public static new HttpMethod Method { get { return HttpMethod.Head; } }
+
         public HeadAttribute(string path) : base(path) { }
     }
     #endregion
@@ -73,6 +79,7 @@ namespace Rest
     public class QueryAttribute : Attribute
     {
         public string Name { get; protected set; }
+
         public QueryAttribute(string name)
         {
             this.Name = name;
@@ -83,6 +90,7 @@ namespace Rest
     public class AliasAttribute : Attribute
     {
         public string Name { get; protected set; }
+
         public AliasAttribute(string name)
         {
             this.Name = name;
@@ -90,7 +98,7 @@ namespace Rest
     }
     #endregion
 
-    #region Header
+    #region Header(s)
     [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
     public class HeaderAttribute : Attribute
     {
@@ -112,7 +120,7 @@ namespace Rest
         /// <summary>
         /// As a parameter attribute, indicates that the header will have the value
         /// specified by <see cref="Name"/>.
-        /// As a method attribute, indicates that the default header (specified in class) will be removed.
+        /// As a method attribute, throws.
         /// As a class attribute, throws.
         /// </summary>
         public HeaderAttribute(string name)
@@ -153,7 +161,27 @@ namespace Rest
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = false)]
     public class RestClientAttribute : Attribute
     {
-        public RestClientAttribute() { }
+        public RestClientAttribute()
+        {
+        }
+    }
+    #endregion
+
+    #region Serializer / Deserializer
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
+    public class RestSerializerAttribute : Attribute
+    {
+        public RestSerializerAttribute()
+        {
+        }
+    }
+
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
+    public class RestDeserializerAttribute : Attribute
+    {
+        public RestDeserializerAttribute()
+        {
+        }
     }
     #endregion
 }
