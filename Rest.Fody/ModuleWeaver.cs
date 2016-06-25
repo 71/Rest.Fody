@@ -101,7 +101,7 @@ namespace Rest.Fody
                             deserStr = DeserializeStr,
                             deserBuf = DeserializeBuf;
 
-                        FindDeserializeMethods(t.Methods.Where(x => !x.IsStatic), out serStr, out serBuf, out deserStr, out deserBuf);
+                        FindDeserializeMethods(t.Methods.Where(x => !x.IsStatic), ref serStr, ref serBuf, ref deserStr, ref deserBuf);
 
                         // valid type, try to find a client
                         MethodDefinition httpClientGetter = null;
@@ -135,16 +135,22 @@ namespace Rest.Fody
                         Logger.Log($"Adding methods for type {t.Name}", false);
 
                         // http client getter exists ; gotta scan all methods for attributes
-                        string relativePath = null;
-                        MethodReference httpMethodGetter = null;
-                        foreach (MethodDefinition method in t.Methods.Where(x => IsValidHttpMethod(x, out relativePath, out httpMethodGetter)))
+
+                        for (int i = 0; i < t.Methods.Count; i++)
                         {
-                            Logger.Log($"Creating method: {t.Name}.{method.Name}");
+                            string relativePath = null;
+                            MethodReference httpMethodGetter = null;
 
-                            Logger.Log("GENERATING METHOD", () => AddRestClientMethod(httpClientGetter, method, httpMethodGetter, relativePath, serStr, serBuf, deserStr, deserBuf));
+                            MethodDefinition method = t.Methods[i];
+                            if (IsValidHttpMethod(method, out relativePath, out httpMethodGetter))
+                            {
+                                Logger.Log($"Creating method: {t.Name}.{method.Name}");
 
-                            ModifiedMethods++;
-                            Logger.Log($"Done creating extern method {t.Name}.{method.Name}.");
+                                Logger.Log("GENERATING METHOD", () => AddRestClientMethod(httpClientGetter, method, httpMethodGetter, relativePath, serStr, serBuf, deserStr, deserBuf));
+
+                                ModifiedMethods++;
+                                Logger.Log($"Done creating extern method {t.Name}.{method.Name}.");
+                            }
                         }
 
                         ModifiedTypes++;

@@ -24,7 +24,6 @@ namespace Rest.Fody.Tests
             gc.SayMore("something", DateTime.Now).ContinueWith(task =>
             {
                 Console.WriteLine(task.Result);
-                Console.WriteLine(task.IsFaulted);
             });
             Console.ReadKey();
         }
@@ -42,15 +41,21 @@ namespace Rest.Fody.Tests
         public extern Task<string> Say(string something = "you");
 
         [Post("/hello/{hey}")]
-        public extern Task<string> SayMore([Alias("hey")] string something, [Body] DateTime date);
+        public extern Task<DateTime> SayMore([Alias("hey")] string something, [Body] DateTime date);
 
         [RestSerializer]
-        public string Serialize(object o)
+        public static string Serialize(object o)
         {
             if (o is DateTime)
                 return ((DateTime)o).ToLongDateString();
             else
                 return o.ToString();
+        }
+
+        [RestDeserializer]
+        public static T Deserialize<T>(string s)
+        {
+            return default(T);
         }
     }
 }

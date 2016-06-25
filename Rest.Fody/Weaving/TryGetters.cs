@@ -84,6 +84,9 @@ namespace Rest.Fody
             if (path == null)
                 throw WeavingException.AttrValuesCannotBeNull;
 
+            //if (!m.ReturnType.IsGenericInstance && !m.ReturnType.gener)
+            //    throw new WeavingException("Methods must return a task, or a derived class.");
+
             return true;
         }
     }

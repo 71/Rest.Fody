@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Threading.Tasks;
 
-namespace Rest.Fody.Weaving
+namespace Rest.Fody.Helpers
 {
     /// <summary>
     /// Class used by Rest.Fody to make creating HttpRequestMessage's easier

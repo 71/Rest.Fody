@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 using Mono.Cecil;
+using Rest.Fody.Helpers;
 using Rest.Fody.Weaving;
 
 namespace Rest.Fody
@@ -29,11 +31,17 @@ namespace Rest.Fody
         private MethodReference BaseAddress_Set;
         private MethodReference DefaultHeaders_Get;
         private MethodReference Method_Get;
+        private MethodReference Content_Get;
+        private MethodReference StatusCode_Get;
 
         // methods
         private MethodReference HttpHeaders_Add;
         private MethodReference HttpClient_SendAsync;
         private MethodReference Object_ToString;
+        private MethodReference Task_ContinueWith;
+        private MethodReference HttpContent_ReadAsStringAsync;
+        private MethodReference HttpContent_ReadAsByteArrayAsync;
+        private MethodReference HttpContent_ReadAsStreamAsync;
 
 
         // proxy
@@ -46,6 +54,12 @@ namespace Rest.Fody
         private MethodReference Proxy_AddBodyBuf;
         private MethodReference Proxy_AddQuery;
         private MethodReference Proxy_AddPathArg;
+
+        private MethodReference Proxy_GetContentString;
+        private MethodReference Proxy_GetContentStream;
+        private MethodReference Proxy_GetContentByteArray;
+        private MethodReference Proxy_GetResponse;
+        private MethodReference Proxy_GetStatusCode;
 
 
         // (de)serializer
@@ -75,12 +89,18 @@ namespace Rest.Fody
             BaseAddress_Set = ModuleDefinition.ImportSetter<HttpClient, Uri>(x => x.BaseAddress);
             DefaultHeaders_Get = ModuleDefinition.ImportGetter<HttpClient, HttpRequestHeaders>(x => x.DefaultRequestHeaders);
             Method_Get = ModuleDefinition.ImportGetter<HttpMethod, string>(x => x.Method);
+            Content_Get = ModuleDefinition.ImportGetter<HttpResponseMessage, HttpContent>(x => x.Content);
+            StatusCode_Get = ModuleDefinition.ImportGetter<HttpResponseMessage, HttpStatusCode>(x => x.StatusCode);
 
 
             Logger.Log("Importing methods.", false);
             HttpHeaders_Add = ModuleDefinition.ImportMethod<HttpHeaders>(nameof(HttpHeaders.Add), typeof(string), typeof(string));
             HttpClient_SendAsync = ModuleDefinition.ImportMethod<HttpClient>(nameof(HttpClient.SendAsync), typeof(HttpRequestMessage));
             Object_ToString = ModuleDefinition.ImportMethod<object>(nameof(Object.ToString));
+            Task_ContinueWith = ModuleDefinition.ImportMethod<Task>(nameof(Task.ContinueWith), typeof(Action<Task>));
+            HttpContent_ReadAsStringAsync = ModuleDefinition.ImportMethod<HttpContent>(nameof(HttpContent.ReadAsStringAsync));
+            HttpContent_ReadAsStreamAsync = ModuleDefinition.ImportMethod<HttpContent>(nameof(HttpContent.ReadAsStreamAsync));
+            HttpContent_ReadAsByteArrayAsync = ModuleDefinition.ImportMethod<HttpContent>(nameof(HttpContent.ReadAsByteArrayAsync));
 
 
             Logger.Log("Importing everything proxy-related.", false);
@@ -94,21 +114,25 @@ namespace Rest.Fody
             Proxy_AddQuery = ModuleDefinition.ImportMethod<MessageProxy>(nameof(MessageProxy.AddQuery), typeof(string), typeof(object));
             Proxy_AddPathArg = ModuleDefinition.ImportMethod<MessageProxy>(nameof(MessageProxy.AddPathArg), typeof(string), typeof(object));
 
+            Proxy_GetContentString = ModuleDefinition.ImportMethod<Bridge>(nameof(Bridge.CallString), typeof(Task<HttpResponseMessage>));
+            Proxy_GetContentByteArray = ModuleDefinition.ImportMethod<Bridge>(nameof(Bridge.CallByteArray), typeof(Task<HttpResponseMessage>));
+            Proxy_GetContentStream = ModuleDefinition.ImportMethod<Bridge>(nameof(Bridge.CallStream), typeof(Task<HttpResponseMessage>));
+            Proxy_GetResponse = ModuleDefinition.ImportMethod<Bridge>(nameof(Bridge.CallResponse), typeof(Task<HttpResponseMessage>));
+            Proxy_GetStatusCode = ModuleDefinition.ImportMethod<Bridge>(nameof(Bridge.CallStatusCode), typeof(Task<HttpResponseMessage>));
+
 
             Logger.Log("Importing serializer / deserializer.", false);
 
             FindDeserializeMethods(ModuleDefinition.GetTypes().SelectMany(x => x.Methods).Where(x => x.IsStatic),
-                out SerializeStr, out SerializeBuf, out DeserializeStr, out DeserializeBuf);
+                ref SerializeStr, ref SerializeBuf, ref DeserializeStr, ref DeserializeBuf);
         }
 
         private static void FindDeserializeMethods(IEnumerable<MethodDefinition> collection,
-            out MethodDefinition serStr, out MethodDefinition serBuf,
-            out MethodDefinition deserStr, out MethodDefinition deserBuf)
+            ref MethodDefinition serStr, ref MethodDefinition serBuf,
+            ref MethodDefinition deserStr, ref MethodDefinition deserBuf)
         {
             bool serDone = false,
                  deserDone = false;
-
-            serStr = serBuf = deserStr = deserBuf = null;
 
             foreach (MethodDefinition method in collection)
             {
@@ -142,7 +166,7 @@ namespace Rest.Fody
                     CustomAttribute serializeAttr = method.GetAttr<RestSerializerAttribute>();
                     if (serializeAttr != null)
                     {
-                        if (method.Parameters.Count != 1 || !method.Parameters[0].ParameterType.Is<object>())
+                        if (method.Parameters.Count != 1 || method.Parameters[0].ParameterType.Name != "Object")
                             throw new WeavingException("A method marked [RestSerializer] must accept a single parameter: object.");
 
                         if (method.ReturnType.Is<string>())
