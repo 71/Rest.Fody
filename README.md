@@ -17,20 +17,17 @@ public class API
 
 ## Source structure
 
-### Attributes.cs
-#### Namespace: `Rest`
-Attributes usable in the user's code.
+### Rest.Fody
+All the weaving code.
 
-### Constants.cs
-#### Namespace: `Rest.Fody`
-Constants, such as type & property names.
+### Rest.Fody.Portable
+All the attributes.
 
-### ModuleWeavers.cs
-#### Namespace: `Rest.Fody`
-The entry point of the weaver. Defines basic methods.
+### Rest.Fody.Tests
+Some random tests ; TODO.
 
-### Weaving/Middleware.cs
-#### Namespace: `Rest.Fody`
+### Shared
+Code shared between Rest.Fody.Portable and Rest.Fody.
 
 ## API
 
@@ -61,14 +58,37 @@ With the `[ServiceFor(URL)]` attribute, it is also possible to specify custom he
 public extern Task CheckInternetConnection();
 ```
 A request must be marked `extern`, and return either a `Task`, a `Task<T>`, or any object whose base class is `Task`.  
-On failure, a request will throw a `RestException`, which contains the `StatusCode` and the `ReasonPhrase` of the failure.
+On failure, a request will throw a `RestException`, which contains a `HttpResponseMessage`.
 
 ### Deserialization / Serialization
 To free itself of any dependency besides Fody and Mono.Cecil, Rest.Fody will not be able to deserialize or serialize types besides all numeric types, `Stream`, `string` and `byte[]`. When deserializing, `HttpResponseMessage` is also accepted.
 
-To add your own (de)serialization, declare one of those methods in a static class marked with the `[]` attribute, or in the class itself:
+To add your own (de)serialization, declare one of those methods with the `[RestSerialize]` or `[RestDeserialize]` attribute:
 - `string Serialize(object obj)` *or* `byte[] Serialize(object obj)`
 - `T Deserialize<T>(string src)` *or* `T Deserialize<T>(byte[] bytes)`
+
+Valid implementations:
+```csharp
+[Service]
+public class API
+{
+    [RestDeserializer] private T Deserialize<T>(string str) { ... }
+    [RestDeserializer] private T Deserialize<T>(byte[] buf) { ... }
+    [RestSerializer] private string Serialize(object o) { ... }
+    [RestSerializer] private byte[] Serialize(object o) { ... }
+}
+```
+or
+```csharp
+public class Utils
+{
+    [RestDeserializer] public static T Deserialize<T>(string str) { ... }
+    [RestDeserializer] public static T Deserialize<T>(byte[] buf) { ... }
+    [RestSerializer] public static string Serialize(object o) { ... }
+    [RestSerializer] public static byte[] Serialize(object o) { ... }
+}
+```
+The instance methods will be chosen in priority, but will fallback to the static methods if needed.
 
 ### Query, dynamic url
 ```csharp
@@ -120,3 +140,4 @@ Headers can be specified on both classes, methods and parameters:
 - Yes, you can do `[Get("http://full.url/user")]`.
 - You can add your own attributes if they inherit the `HttpMethodAttribute` and override its static property `Method` with the `new` keyword.
 - Most checks are done on **build**, but that does not mean that it is perfectly safe.
+- There is no need to create a `Serialize(object)` method if we only manipulate byte arrays and strings. Same remark with `T Deserialize<T>()`.
