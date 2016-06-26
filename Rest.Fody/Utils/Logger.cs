@@ -8,26 +8,21 @@ namespace Rest.Fody
 {
     internal sealed class Logger
     {
+        public string Step { get; private set; }
+        public IReadOnlyList<string> DoneSteps { get { return done_steps.AsReadOnly(); } }
+
         private List<string> done_steps;
         private Stack<string> layers;
 
         private Action<string> logsInfo;
         private Action<string> logsImportant;
 
-        private object lockObj;
-
-
-        public IReadOnlyList<string> DoneSteps { get { return done_steps.AsReadOnly(); } }
-        public string Step { get; private set; }
-
         public Logger(Action<string> info, Action<string> important)
         {
             layers = new Stack<string>();
             done_steps = new List<string>();
-            lockObj = Guid.NewGuid();
 
             logsImportant = important;
-
 #if DEBUG
             logsInfo = important;
 #else
@@ -46,73 +41,52 @@ namespace Rest.Fody
         }
 
         /// <summary>
-        /// Start logging a big step.
-        /// All logs executed while running the given <see cref="Action"/>
-        /// will be marked with a [step] tag.
+        /// Enter a region. In a region, all logs are prexifed by its name in brackets.
         /// </summary>
-        /// <param name="step"></param>
-        /// <param name="action"></param>
-        public void Log(string step, Action action)
+        public void Region(string name, Action action)
         {
-            lock (lockObj)
-                layers.Push(step);
-
+            layers.Push(name);
             action();
-
-            lock (lockObj)
-                layers.Pop();
+            layers.Pop();
         }
 
+        /// <summary>
+        /// Enter a region. In a region, all logs are prexifed by its name in brackets.
+        /// </summary>
+        public T Region<T>(string step, Func<T> action)
+        {
+            layers.Push(step);
+            T res = action();
+            layers.Pop();
+            return res;
+        }
+
+        /// <summary>
+        /// Log a non-important message: "name is null" or "name isn't null".
+        /// </summary>
         public void LogNull(string name, object o)
         {
             Log($"{name} is{(o == null ? " null" : "n't null")}");
         }
 
         /// <summary>
-        /// Start logging a big step.
-        /// All logs executed while running the given <see cref="Action"/>
-        /// will be marked with a [step] tag.
+        /// Log a non-important step.
         /// </summary>
-        public T Log<T>(string step, Func<T> action)
-        {
-            lock (lockObj)
-                layers.Push(step);
-
-            T res = action();
-
-            lock (lockObj)
-                layers.Pop();
-
-            return res;
-        }
-
         public void Log(string step)
         {
             Log(step, false);
         }
 
+        /// <summary>
+        /// Log a step.
+        /// </summary>
         public void Log(string step, bool important)
         {
             if (Step != null)
                 done_steps.Add(Step);
 
             InternalLog(step, important);
-
-            lock (lockObj)
-                Step = step;
-        }
-
-        public void LogAll(IEnumerable<string> toLog)
-        {
-            foreach (string s in toLog ?? new string[0])
-                Log(s, false);
-        }
-
-        public void LogAll(string msg, IEnumerable<string> toLog)
-        {
-            Log(msg, false);
-            foreach (string s in toLog ?? new string[0])
-                Log(s, false);
+            Step = step;
         }
 
         public override string ToString()

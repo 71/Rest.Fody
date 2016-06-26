@@ -15,26 +15,32 @@ namespace Rest.Fody.Tests
 
             GoodClient gc = new GoodClient();
 
-            gc.Say().ContinueWith(task =>
+            gc.SayHey().ContinueWith(task =>
             {
-                Console.WriteLine(task.Result);
-                Console.WriteLine(task.IsFaulted);
-            });
+                if (task.IsFaulted)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine(task.Exception.Message);
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine(task.Result);
+                }
 
-            gc.SayMore("something", DateTime.Now).ContinueWith(task =>
-            {
-                Console.WriteLine(task.Result);
+                gc.Dispose();
             });
+            
             Console.ReadKey();
         }
     }
 
-    [ServiceFor("http://hello.com/api/v1")]
+    [ServiceFor("http://hello.com")]
     [Header("Authorization", "Bearer Something")]
-    public class GoodClient
+    public class GoodClient : IDisposable
     {
-        [Get("/hello/hey")]
-        public extern Task<string> SayHey();
+        [Get("/")]
+        public extern Task<WTFClass<DateTime>> SayHey();
 
         [Get("/hello/{something}")]
         [Header("Authorization", "Bearer Something else")]
@@ -57,5 +63,15 @@ namespace Rest.Fody.Tests
         {
             return default(T);
         }
+
+        public void Dispose()
+        {
+
+        }
+    }
+
+    public class WTFClass<T>
+    {
+
     }
 }

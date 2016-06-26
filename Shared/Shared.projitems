@@ -10,8 +10,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Attributes.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Bridge.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)MessageProxy.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helpers\AsyncProxy.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helpers\MessageProxy.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)RestException.cs" />
   </ItemGroup>
 </Project>

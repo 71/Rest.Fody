@@ -8,11 +8,40 @@ using System.Text;
 using System.Threading.Tasks;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
+using TinyIoC;
 
-namespace Rest.Fody.Weaving
+namespace Rest.Fody
 {
-    public static class Utils
+    internal static class Extensions
     {
+        private static TinyIoCContainer Container
+        {
+            get { return TinyIoCContainer.Current; }
+        }
+
+        private static Logger Logger
+        {
+            get { return Container.Resolve<Logger>(); }
+        }
+
+        /// <summary>
+        /// Returns a new <see cref="WeavingException"/>, whose <see cref="Exception.Message"/> is
+        /// "(TypeName) {msg}"
+        /// </summary>
+        public static WeavingException Message(this TypeDefinition self, string msg)
+        {
+            return new WeavingException($"({self.Name}) {msg}");
+        }
+
+        /// <summary>
+        /// Returns a new <see cref="WeavingException"/>, whose <see cref="Exception.Message"/> is
+        /// "(TypeName.MethodName) {msg}"
+        /// </summary>
+        public static WeavingException Message(this MethodDefinition self, string msg)
+        {
+            return new WeavingException($"({self.DeclaringType.Name}.{self.Name}) {msg}");
+        }
+
         #region Misc
         public static void Emit(this Mono.Cecil.Cil.MethodBody body, Action<ILProcessor> il)
         {
@@ -50,6 +79,16 @@ namespace Rest.Fody.Weaving
             });
         }
 
+        public static void EmitManyBefore(this Mono.Cecil.Cil.MethodBody body, int index, params Instruction[] instructions)
+        {
+            body.Emit(il =>
+            {
+                var before = body.Instructions[index];
+                foreach (Instruction i in instructions)
+                    il.InsertBefore(before, i);
+            });
+        }
+
 
         public static bool Is<T>(this TypeReference typeRef, bool acceptDerivedTypes = false)
         {
@@ -66,7 +105,10 @@ namespace Rest.Fody.Weaving
 
         public static Type AsType(this TypeReference typeRef)
         {
-            return Type.GetType(Assembly.CreateQualifiedName(typeRef.Module.Assembly.FullName, typeRef.FullName));
+            Type t = Container.Resolve<Type[]>().First(x => x.Name == typeRef.Name);
+            if (typeRef is GenericInstanceType)
+                t = t.MakeGenericType(((GenericInstanceType)typeRef).GenericArguments.Select(x => x.AsType()).ToArray());
+            return t;
         }
         #endregion
 
@@ -99,14 +141,6 @@ namespace Rest.Fody.Weaving
             return module.Import(typeof(T).GetMethod(name, paramTypes));
         }
 
-        public static MethodReference ImportContinueWith(this ModuleDefinition module, TypeReference target)
-        {
-            return (MethodReference)typeof(Utils)
-                .GetMethod("ImportContinueWith", new Type[] { typeof(ModuleDefinition) })
-                .MakeGenericMethod(target.AsType())
-                .Invoke(null, new object[] { module });
-        }
-
         public static MethodReference ImportContinueWith(this ModuleDefinition module, Type target1, Type target2)
         {
             return module.Import((from m in target1.GetMethods()
@@ -114,15 +148,6 @@ namespace Rest.Fody.Weaving
                                   let p = m.GetParameters()
                                   where p.Length == 1 && p[0].ParameterType.Name == "Func`2"
                                   select m.MakeGenericMethod(target2)).First());
-        }
-
-        public static MethodReference ImportContinueWith<T>(this ModuleDefinition module)
-        {
-            return module.Import((from m in typeof(Task<HttpResponseMessage>).GetMethods()
-                                  where m.Name == "ContinueWith"
-                                  let p = m.GetParameters()
-                                  where p.Length == 1 && p[0].ParameterType.Name == "Func`2"
-                                  select m.MakeGenericMethod(typeof(T))).First());
         }
 
         public static FieldReference ImportField<T, TField>(ModuleDefinition module, Expression<Func<T, TField>> ex)
