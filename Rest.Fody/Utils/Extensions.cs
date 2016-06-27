@@ -150,15 +150,37 @@ namespace Rest.Fody
                                   select m.MakeGenericMethod(target2)).First());
         }
 
+        public static MethodReference ImportContinueWith(this ModuleDefinition module, TypeDefinition target1, TypeReference target2)
+        {
+            return module.Import((from m in target1.Methods
+                                  where m.Name == "ContinueWith"
+                                  let p = m.Parameters
+                                  where p.Count == 1 && p[0].ParameterType.Name == "Func`2"
+                                  select m.MakeGenericMethod(target2)).First());
+        }
+
+        public static MethodReference ImportFuncConstructor(this ModuleDefinition module, TypeDefinition target1, TypeReference target2)
+        {
+            //return Module.Import(typeof(Func<,>).MakeGenericType(genType, returnTypeSrc).GetConstructors().First());
+            var func = module.Import(module.Import(typeof(Func<,>)).MakeGenericType(target1, target2).Resolve());
+            //var func = new TypeReference("System", "Func`2", module, module.AssemblyReferences.First(x => x.Name == "System")).MakeGenericType(target1, target2);
+            return new MethodReference(".ctor", func, func); // func.Resolve().Methods.First(x => x.IsConstructor);
+        }
+
         public static MethodReference ImportToObservable(this ModuleDefinition module, TypeDefinition toe, TypeReference target)
         {
             return module.Import(toe.Methods.First(x => x.Name == "ToObservable" && x.ContainsGenericParameter)).MakeGenericMethod(target);
         }
 
-        public static FieldReference ImportField<T, TField>(ModuleDefinition module, Expression<Func<T, TField>> ex)
+        public static FieldReference ImportField<T, TField>(this ModuleDefinition module, Expression<Func<T, TField>> ex)
         {
             MemberExpression dp = ex.Body as MemberExpression;
             return module.Import(typeof(T).GetField(dp.Member.Name));
+        }
+
+        public static FieldReference ImportField<T>(this ModuleDefinition module, string name)
+        {
+            return module.Import(typeof(T).GetField(name));
         }
 
         public static MethodReference ImportGetter<T, TProp>(this ModuleDefinition module, Expression<Func<T, TProp>> ex)

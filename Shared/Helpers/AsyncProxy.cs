@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Rest.Fody.Helpers
@@ -13,6 +15,7 @@ namespace Rest.Fody.Helpers
     /// <summary>
     /// Helper class used by Rest.Fody to use async/await methods from IL.
     /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class AsyncProxy
     {
         #region Status codes

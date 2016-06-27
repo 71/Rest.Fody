@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -9,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Mono.Cecil;
+using Rest.Fody.Helpers;
 using Rest.Fody.Weaving;
 using TinyIoC;
 
@@ -16,33 +18,51 @@ namespace Rest.Fody
 {
     public sealed partial class ModuleWeaver
     {
-        // Will log an MessageImportance.Normal message to MSBuild.
+        /// <summary>
+        /// Will log a MessageImportance.Normal message to MSBuild.
+        /// </summary>
         public Action<string> LogDebug { get; set; } = m => { };
 
-        // Will log an MessageImportance.High message to MSBuild.
+        /// <summary>
+        /// Will log a MessageImportance.High message to MSBuild.
+        /// </summary>
         public Action<string> LogInfo { get; set; } = m => { };
 
-        // Will log an warning message to MSBuild.
+        /// <summary>
+        /// Will log a MessageImportance.Warning message to MSBuild.
+        /// </summary>
         public Action<string> LogWarning { get; set; } = m => { };
 
-        // Will log an error message to MSBuild.
+        /// <summary>
+        /// Will log an error message to MSBuild.
+        /// </summary>
         public Action<string> LogError { get; set; } = m => { };
 
-        // Will contain the full element XML from FodyWeavers.xml.
+        /// <summary>
+        /// Will contain the full XML from FodyWeavers.xml.
+        /// </summary>
         public XElement Config { get; set; }
-
-        // An instance of Mono.Cecil.ModuleDefinition for processing.
+        
+        /// <summary>
+        ///An instance of Mono.Cecil.ModuleDefinition for processing.
+        /// </summary>
         public ModuleDefinition ModuleDefinition { get; set; }
-
-        // An instance of Mono.Cecil.IAssemblyResolver for resolving assembly references.
+        
+        /// <summary>
+        ///  An instance of Mono.Cecil.IAssemblyResolver for resolving assembly references.
+        /// </summary>
         public IAssemblyResolver AssemblyResolver { get; set; }
-
-        // Will contain the full path of the target assembly.
+        
+        /// <summary>
+        /// Will contain the full path of the target assembly.
+        /// </summary>
         public string AssemblyFilePath { get; set; }
-
-        // Will contain a semicomma delimetered string that contains 
-        // all the references for the target project. 
-        // A copy of the contents of the @(ReferencePath). OPTIONAL
+        
+        /// <summary>
+        /// Will contain a semicomma delimetered string that contains 
+        /// all the references for the target project. 
+        /// A copy of the contents of the @(ReferencePath).
+        /// </summary>
         public string References { get; set; }
 
         public Assembly ExecutingAssembly { get; set; }
@@ -100,12 +120,11 @@ namespace Rest.Fody
                     }
                 }
             }).ToArray());
-            Container.Register<Type[]>(ReferencedAssembly.SafeGetTypes().Concat(Container.Resolve<Assembly[]>().SelectMany(x => x.SafeGetTypes())).ToArray());
+            Container.Register(ReferencedAssembly.SafeGetTypes().Concat(Container.Resolve<Assembly[]>().SelectMany(x => x.SafeGetTypes())).ToArray());
 
 
             // registration
             Container.Register(ModuleDefinition);
-            Container.Register(new WeavingOptions { });
 
             ClassWeaver cw = new ClassWeaver();
             MethodWeaver mw = new MethodWeaver();
@@ -121,6 +140,20 @@ namespace Rest.Fody
 
             Container.Register(cw);
             Container.Register(mw);
+
+            
+            // options
+            WeavingOptions opts = new WeavingOptions();
+            foreach (XAttribute attr in Config.Attributes())
+            {
+                if (attr.Name == "AddHeadersToAlreadyExistingHttpClient")
+                    opts.AddHeadersToAlreadyExistingHttpClient = attr.Value.Equals("true", StringComparison.InvariantCultureIgnoreCase);
+                else if (attr.Name == "SupportsMultiBody")
+                    opts.SupportsMultiBody = attr.Value.Equals("true", StringComparison.InvariantCultureIgnoreCase);
+            }
+            Logger.Log(opts.ToString());
+            Container.Register(opts);
+
 
 
             // stats

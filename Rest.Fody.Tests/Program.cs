@@ -12,12 +12,17 @@ namespace Rest.Fody.Tests
     {
         static void Main(string[] args)
         {
-            HttpClient cl = new HttpClient();
-            Uri i = new Uri("http://example.com");
+            //HttpClient cl = new HttpClient();
+            //Uri i = new Uri("http://example.com");
 
             GoodClient gc = new GoodClient();
 
-            gc.SayHey().ContinueWith(task =>
+            //new Task<string>(() => "").ContinueWith<WTFClass<DateTime>>(task =>
+            //{
+            //    return null;
+            //});
+
+            gc.SayMore("heyyy", DateTime.Now).ContinueWith(task =>
             {
                 if (task.IsFaulted)
                 {
@@ -31,18 +36,18 @@ namespace Rest.Fody.Tests
                 }
             });
 
-            System.Reactive.Threading.Tasks.TaskObservableExtensions.ToObservable(new Task(() => { }));
+            //System.Reactive.Threading.Tasks.TaskObservableExtensions.ToObservable(new Task(() => { }));
 
-            gc.Say().Subscribe(n =>
-            {
-                Console.WriteLine("HEYA");
-            }, e =>
-            {
-                Console.WriteLine("HEYA");
-            }, () =>
-            {
-                Console.WriteLine("HEYA");
-            });
+            //gc.Say().Subscribe(n =>
+            //{
+            //    Console.WriteLine("HEYA");
+            //}, e =>
+            //{
+            //    Console.WriteLine("HEYA");
+            //}, () =>
+            //{
+            //    Console.WriteLine("HEYA");
+            //});
             
             Console.ReadKey();
         }
@@ -55,9 +60,9 @@ namespace Rest.Fody.Tests
         [Get("/")]
         public extern Task<WTFClass<DateTime>> SayHey();
 
-        [Get("/hello/{something}")]
-        [Header("Authorization", "Bearer Something else")]
-        public extern IObservable<string> Say(string something = "you");
+        //[Get("/hello/{something}")]
+        //[Header("Authorization", "Bearer Something else")]
+        //public extern IObservable<string> Say(string something = "you");
 
         [Post("/hello/{hey}")]
         public extern Task<HttpStatusCode> SayMore([Alias("hey")] string something, [Body] DateTime date);

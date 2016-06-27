@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -11,8 +13,19 @@ namespace Rest.Fody.Helpers
     /// <summary>
     /// Helper class used by Rest.Fody to create <see cref="HttpRequestMessage"/>s easily from IL.
     /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class MessageProxy
     {
+        private byte[] serializeBuf(object o)
+        {
+            throw new NotImplementedException();
+        }
+
+        private string serializeStr(object o)
+        {
+            throw new NotImplementedException();
+        }
+
         private string rawpath;
         private string endpath;
 

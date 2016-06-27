@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace Rest.Fody
 {
+    /// <summary>
+    /// Options parsed from the XML options.
+    /// </summary>
     public sealed class WeavingOptions
     {
         /// <summary>
@@ -14,9 +17,13 @@ namespace Rest.Fody
         /// </summary>
         public bool AddHeadersToAlreadyExistingHttpClient = false;
 
-        /// <summary>
-        /// Support <see cref="IObservable{T}"/>
-        /// </summary>
-        public bool SupportRx = true;
+        public override string ToString()
+        {
+            StringBuilder sb = new StringBuilder();
+
+            sb.AppendLine($"AddHeadersToAlreadyExistingHttpClient: {AddHeadersToAlreadyExistingHttpClient}");
+
+            return sb.ToString();
+        }
     }
 }

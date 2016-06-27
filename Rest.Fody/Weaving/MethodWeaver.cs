@@ -6,9 +6,11 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
+using Mono.Cecil.Rocks;
 using Rest.Fody.Helpers;
 using TinyIoC;
 using SR = System.Reflection;
@@ -23,6 +25,7 @@ namespace Rest.Fody.Weaving
 
         // methods
         private MethodReference HttpClient_SendAsync;
+        private MethodReference CancellationToken_None;
 
         // proxy
         private TypeReference ProxyRef;
@@ -30,10 +33,10 @@ namespace Rest.Fody.Weaving
         private MethodReference Proxy_Compile;
         private MethodReference Proxy_AddHeader;
         private MethodReference Proxy_AddHeaders;
-        private MethodReference Proxy_AddBodyStr;
-        private MethodReference Proxy_AddBodyBuf;
         private MethodReference Proxy_AddQuery;
         private MethodReference Proxy_AddPathArg;
+        private MethodReference Proxy_AddBodyStr;
+        private MethodReference Proxy_AddBodyBuf;
 
         private MethodReference Proxy_GetContentString;
         private MethodReference Proxy_GetContentStream;
@@ -49,35 +52,33 @@ namespace Rest.Fody.Weaving
 
         public override void ImportNecessaryReferences()
         {
-            var reactiveLinq = Module.AssemblyReferences.First(x => x.Name.StartsWith("System.Reactive.Linq"));
+            var reactiveLinq = Module.AssemblyReferences.FirstOrDefault(x => x.Name.StartsWith("System.Reactive.Linq"));
 
             // types
             ProxyRef = Module.ImportType<MessageProxy>();
-            Reactive_TaskObservableExtensionsDef = new TypeReference("System.Reactive.Threading.Tasks", "TaskObservableExtensions", Module, reactiveLinq).Resolve();
-
-            if (Reactive_TaskObservableExtensionsDef == null)
-                throw new WeavingException("Cannot find type System.Reactive.Threading.Tasks.TaskObservableExtensions.");
+            Reactive_TaskObservableExtensionsDef = new TypeReference("System.Reactive.Threading.Tasks", "TaskObservableExtensions", Module, reactiveLinq)?.Resolve();
 
             // ctor
             Proxy_Ctor = Module.ImportCtor<MessageProxy>(typeof(HttpMethod), typeof(string));
+
+            // method
+            HttpClient_SendAsync = Module.ImportMethod<HttpClient>(nameof(HttpClient.SendAsync), typeof(HttpRequestMessage), typeof(CancellationToken));
+            CancellationToken_None = Module.ImportMethod<CancellationToken>("get_None");
 
             // proxy methods
             Proxy_Compile = Module.ImportMethod<MessageProxy>(nameof(MessageProxy.Compile));
             Proxy_AddHeader = Module.ImportMethod<MessageProxy>(nameof(MessageProxy.AddHeader), typeof(string), typeof(object));
             Proxy_AddHeaders = Module.ImportMethod<MessageProxy>(nameof(MessageProxy.AddHeaders), typeof(IDictionary<string, object>));
-            Proxy_AddBodyStr = Module.ImportMethod<MessageProxy>(nameof(MessageProxy.AddBody), typeof(string));
-            Proxy_AddBodyBuf = Module.ImportMethod<MessageProxy>(nameof(MessageProxy.AddBody), typeof(byte[]));
             Proxy_AddQuery = Module.ImportMethod<MessageProxy>(nameof(MessageProxy.AddQuery), typeof(string), typeof(object));
             Proxy_AddPathArg = Module.ImportMethod<MessageProxy>(nameof(MessageProxy.AddPathArg), typeof(string), typeof(object));
+            Proxy_AddBodyStr = Module.ImportMethod<MessageProxy>(nameof(MessageProxy.AddBody), typeof(string));
+            Proxy_AddBodyBuf = Module.ImportMethod<MessageProxy>(nameof(MessageProxy.AddBody), typeof(byte[]));
 
             Proxy_GetContentString = Module.ImportMethod<AsyncProxy>(nameof(AsyncProxy.CallString), typeof(Task<HttpResponseMessage>));
             Proxy_GetContentByteArray = Module.ImportMethod<AsyncProxy>(nameof(AsyncProxy.CallByteArray), typeof(Task<HttpResponseMessage>));
             Proxy_GetContentStream = Module.ImportMethod<AsyncProxy>(nameof(AsyncProxy.CallStream), typeof(Task<HttpResponseMessage>));
             Proxy_GetResponse = Module.ImportMethod<AsyncProxy>(nameof(AsyncProxy.CallResponse), typeof(Task<HttpResponseMessage>));
             Proxy_GetStatusCode = Module.ImportMethod<AsyncProxy>(nameof(AsyncProxy.CallStatusCode), typeof(Task<HttpResponseMessage>));
-
-            // method
-            HttpClient_SendAsync = Module.ImportMethod<HttpClient>(nameof(HttpClient.SendAsync), typeof(HttpRequestMessage));
 
             // some imports
             Utils.FindDeserializeMethods(Module.GetTypes().SelectMany(x => x.Methods).Where(x => x.IsStatic),
@@ -174,10 +175,17 @@ namespace Rest.Fody.Weaving
                         throw httpClientGetter.Message($"Expected 2 parameters, but got {attr.ConstructorArguments.Count} instead.");
                 }
 
+                byte tokenIndex = 0;
+
                 if (method.HasParameters)
-                    RunParameters(method, il, serStr, serBuf);          // edit request to match parameters (query, alias, body, etc)
+                    RunParameters(method, il, serStr, serBuf, out tokenIndex);  // edit request to match parameters (query, alias, body, etc)
 
                 il.Emit(OpCodes.Callvirt, Proxy_Compile);               // compile proxy to HttpRequestMessage
+
+                if (tokenIndex > 0)
+                    il.Emit(OpCodes.Ldarg_S, tokenIndex);               // if provided, pass the cancellation token
+                else
+                    il.Emit(OpCodes.Call, CancellationToken_None);      // else, pass CancellationToken.None
                 il.Emit(OpCodes.Callvirt, HttpClient_SendAsync);        // this.HttpClient.SendAsync()
 
                 RunReturnValue(method, il, deserStr, deserBuf);         // make sure we return TTask<T>, and not Task<HttpResponseMessage>
@@ -220,31 +228,36 @@ namespace Rest.Fody.Weaving
             {
                 GenericInstanceMethod deser;
                 bool isStatic;
-                Type genType;
+                TypeReference genType;
+                Type genTypeSrc;
+                MethodReference resGetter;
+                MethodReference contentGetter;
 
                 if (deserStr != null)
                 {
                     deser = deserStr.MakeGenericMethod(returnType);
                     isStatic = deserStr.IsStatic;
-                    genType = typeof(Task<string>);
+                    genTypeSrc = typeof(Task<string>);
+                    contentGetter = Proxy_GetContentString;
+                    resGetter = Module.ImportGetter<Task<string>, string>(x => x.Result);
                 }
                 else if (deserBuf != null)
                 {
                     deser = deserBuf.MakeGenericMethod(returnType);
                     isStatic = deserBuf.IsStatic;
-                    genType = typeof(Task<byte[]>);
+                    genTypeSrc = typeof(Task<byte[]>);
+                    contentGetter = Proxy_GetContentByteArray;
+                    resGetter = Module.ImportGetter<Task<byte[]>, byte[]>(x => x.Result);
                 }
                 else
-                {
                     throw m.Message("No serializer / deserializer found.");
-                }
+
+                genType = Module.Import(genTypeSrc);
 
                 MethodDefinition cb = new MethodDefinition($"${m.Name}_cb", MethodAttributes.Private, returnType);
                 cb.Parameters.Add(new ParameterDefinition(Module.Import(genType)));
                 cb.Body.Emit(i =>
-                {
-                    var resGetter = Module.Import(genType.GetMethod("get_Result"));
-                    
+                {                    
                     if (isStatic)
                     {
                         i.Emit(OpCodes.Ldarg_1);
@@ -263,30 +276,97 @@ namespace Rest.Fody.Weaving
 
                 m.DeclaringType.Methods.Add(cb);
 
-                var ctor = Module.Import(typeof(Func<,>).MakeGenericType(genType, returnTypeSrc).GetConstructors().First());
+                // TODO: Replace AsType()
+                #region Unsuccesfull attemps at replacing AsType()
+                //MethodReference stuff = Module.AssemblyResolver.Resolve(Module.AssemblyReferences.First(x => x.Name == "mscorlib"))
+                //    .MainModule.GetType("System.Threading.Tasks.Task`1").Methods.First(x => x.Name == "ContinueWith" && x.);
 
-                il.Emit(OpCodes.Call, genType == typeof(Task<string>)
-                    ? Proxy_GetContentString
-                    : Proxy_GetContentByteArray);               // Task<HttpResponseMessage> -> Task<...>
+                //TypeReference st = new TypeReference("System.Threading.Tasks", "Task`1", Module, Module.AssemblyReferences.First(x => x.Name == "mscorlib"));
+                //MethodReference stuff = new MethodReference("ContinueWith", st, st);
+
+                //Logger.Log(stuff.FullName);
+                //st = Module.Import(st);
+                //stuff = Module.Import(stuff);
+                //var t0 = new GenericParameter(stuff.ReturnType);
+                //var tt0 = new GenericParameter(stuff);
+                //Logger.Log(t0.FullName + " " + t0.Type);
+                //Logger.Log(tt0.FullName + " " + tt0.Type);
+
+                //var taskType = genType;
+
+                //var func = Module.Import(typeof(Func<,>)).MakeGenericType(taskType, returnType);
+
+                //var funcCtor = new MethodReference(".ctor", Module.TypeSystem.Void, func);
+                //funcCtor.Parameters.Add(new ParameterDefinition(Module.TypeSystem.Object));
+                //funcCtor.Parameters.Add(new ParameterDefinition(Module.TypeSystem.IntPtr));
+                //funcCtor.HasThis = true;
+
+                //var continueWith = new GenericInstanceMethod(new MethodReference("ContinueWith", Module.Import(typeof(Task<>)).MakeGenericInstanceType(returnType), taskType) { HasThis = true });
+                //continueWith.GenericArguments.Add(returnType);
+                //continueWith.Parameters.Add(new ParameterDefinition(Module.Import(typeof(Func<,>)).MakeGenericType(taskType, returnType)));
+                //continueWith.GenericParameters.Add(returnType);
+
+                //il.Emit(OpCodes.Call, contentGetter);               // Task<HttpResponseMessage> -> Task<...>
+                //il.Emit(OpCodes.Ldarg_0);
+                //il.Emit(OpCodes.Ldftn, cb);                         // this.cb
+                //il.Emit(OpCodes.Newobj, funcCtor);   // new Func<Task<...>, T>(cb)
+                //il.Emit(OpCodes.Call, continueWith);
+
+                //var ctor = Module.Import(typeof(Func<,>).MakeGenericType(genType, returnTypeSrc).GetConstructors().First());
+                //var func = Module.Import(typeof(Func<,>)).MakeGenericInstanceType(genType, returnType);
+                //var ctor = new MethodReference(".ctor", Module.Import(typeof(void)), func);// Module.Import(typeof(Func<,>)).MakeGenericType(genType, returnType)
+                //                                                    //.Resolve().Methods.First(x => x.IsConstructor); // Module.ImportFuncConstructor(genType, returnType);
+                //ctor.Parameters.Add(new ParameterDefinition(Module.TypeSystem.Object));
+                //ctor.Parameters.Add(new ParameterDefinition(Module.TypeSystem.IntPtr));
+                //ctor.HasThis = true;
+                //il.Emit(OpCodes.Call, contentGetter);           // Task<HttpResponseMessage> -> Task<...>
+                //il.Emit(OpCodes.Ldarg_0);
+                //il.Emit(OpCodes.Ldftn, cb);                     // this.cb
+                //il.Emit(OpCodes.Newobj, Module.Import(ctor));   // new Func<Task<...>, T>(cb)
+                //var contWith = new GenericInstanceMethod(new MethodReference("ContinueWith", m.ReturnType, genType) { HasThis = true });
+                //contWith.Parameters.Add(new ParameterDefinition(func));
+                //contWith.GenericArguments.Add(returnType);
+                //il.Emit(OpCodes.Call, contWith); // Module.ImportContinueWith(genType, returnType)); // Module.ImportContinueWith(genType, returnTypeSrc));
+                #endregion
+
+                var ctor = Module.Import(typeof(Func<,>).MakeGenericType(genTypeSrc, returnTypeSrc).GetConstructors().First());
+
+                il.Emit(OpCodes.Call, contentGetter);           // Task<HttpResponseMessage> -> Task<...>
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldftn, cb);                     // this.cb
                 il.Emit(OpCodes.Newobj, ctor);                  // new Func<Task<...>, T>(cb)
-                il.Emit(OpCodes.Call, Module.ImportContinueWith(genType, returnTypeSrc));
+                il.Emit(OpCodes.Call, Module.ImportContinueWith(genTypeSrc, returnTypeSrc));
             }
 
             // handle IObservable
             if (m.ReturnType.Name == "IObservable`1")
+            {
+                if (Reactive_TaskObservableExtensionsDef == null)
+                    throw m.Message("Cannot find type System.Reactive.Threading.Tasks.TaskObservableExtensions.");
+
                 il.Emit(OpCodes.Call, Module.ImportToObservable(Reactive_TaskObservableExtensionsDef, returnType));
+            }
         }
 
         /// <summary>
         /// Transform every parameters of a method to properties for the newly created <see cref="HttpRequestMessage"/>.
         /// </summary>
-        private void RunParameters(MethodDefinition m, ILProcessor il, MethodDefinition serStr, MethodDefinition serBuf)
+        private void RunParameters(MethodDefinition m, ILProcessor il, MethodDefinition serStr, MethodDefinition serBuf, out byte cancellationTokenIndex)
         {
+            cancellationTokenIndex = byte.MinValue;
+
             foreach (ParameterDefinition p in m.Parameters)
             {
                 byte i = (byte)(p.Index + 1);
+
+                if (p.ParameterType.Is<CancellationToken>())
+                {
+                    if (cancellationTokenIndex > 0)
+                        throw m.Message("Only one CancellationToken can be provided.");
+
+                    cancellationTokenIndex = i;
+                    continue;
+                }
 
                 CustomAttribute body = p.GetAttr<BodyAttribute>();
                 if (body != null)
