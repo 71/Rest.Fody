@@ -1,4 +1,4 @@
-﻿# Rest.Fody
+# Rest.Fody
 A [Fody](https://github.com/Fody/Fody) addin, heavily inspired by [Refit](https://github.com/paulcbetts/refit) and [RestEase](https://github.com/canton7/RestEase).  
 Thankfully, the source code for [ReactiveUI.Fody](https://github.com/kswoll/ReactiveUI.Fody) was easy to understand, and greatly helped me.
 
@@ -133,8 +133,14 @@ Headers can be specified on both classes, methods and parameters:
 **Note**: Default headers specified on a class will be ignored if the class provides its own `HttpClient`.  
 **Note**: A `[Headers]` attribute is valid on parameters that implements `IDictionary<string, string>`.
 
-### Misc
+## Options
+In `FodyWeaver.xml`, options can be passed to Rest.Fody via XML.  
+- **AddHeadersToAlreadyExistingHttpClient** (Default: `False`): Add ``[Header]`` on `HttpClient`, even if it is provided by the user.
+
+## Misc
 - Yes, you can do `[Get("http://full.url/user")]`.
 - You can add your own attributes if they inherit the `HttpMethodAttribute` and override its static property `Method` with the `new` keyword.
-- Most checks are done on **build**, but that does not mean that it is perfectly safe.
+- Most checks are done on **build**, meaning most runtime exceptions will be avoided. But that does not mean that it is perfectly safe.
 - There is no need to create a `Serialize(object)` method if we only manipulate byte arrays and strings. Same remark with `T Deserialize<T>()`.
+- If you use `IObservable<T>`, make sure `System.Reactive.Linq` is referenced, **and** used. If you never use it in your project, it will unlikely be referenced during build.
+- By default, `CancellationToken.None` will be used ; you can however pass your own `CancellationToken` to any of your requests. 
