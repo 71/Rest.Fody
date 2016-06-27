@@ -18,7 +18,10 @@ namespace Rest.Fody.Weaving
     internal sealed class MethodWeaver : Weaver
     {
         #region References
-        // method
+        // types
+        private TypeDefinition Reactive_TaskObservableExtensionsDef;
+
+        // methods
         private MethodReference HttpClient_SendAsync;
 
         // proxy
@@ -37,7 +40,6 @@ namespace Rest.Fody.Weaving
         private MethodReference Proxy_GetContentByteArray;
         private MethodReference Proxy_GetResponse;
         private MethodReference Proxy_GetStatusCode;
-        private MethodReference Proxy_TaskToObservable;
 
         // (de)serializer
         private MethodDefinition SerializeStr;
@@ -47,8 +49,14 @@ namespace Rest.Fody.Weaving
 
         public override void ImportNecessaryReferences()
         {
-            // ref
+            var reactiveLinq = Module.AssemblyReferences.First(x => x.Name.StartsWith("System.Reactive.Linq"));
+
+            // types
             ProxyRef = Module.ImportType<MessageProxy>();
+            Reactive_TaskObservableExtensionsDef = new TypeReference("System.Reactive.Threading.Tasks", "TaskObservableExtensions", Module, reactiveLinq).Resolve();
+
+            if (Reactive_TaskObservableExtensionsDef == null)
+                throw new WeavingException("Cannot find type System.Reactive.Threading.Tasks.TaskObservableExtensions.");
 
             // ctor
             Proxy_Ctor = Module.ImportCtor<MessageProxy>(typeof(HttpMethod), typeof(string));
@@ -67,10 +75,6 @@ namespace Rest.Fody.Weaving
             Proxy_GetContentStream = Module.ImportMethod<AsyncProxy>(nameof(AsyncProxy.CallStream), typeof(Task<HttpResponseMessage>));
             Proxy_GetResponse = Module.ImportMethod<AsyncProxy>(nameof(AsyncProxy.CallResponse), typeof(Task<HttpResponseMessage>));
             Proxy_GetStatusCode = Module.ImportMethod<AsyncProxy>(nameof(AsyncProxy.CallStatusCode), typeof(Task<HttpResponseMessage>));
-            
-            Proxy_TaskToObservable = Module.Import(typeof(AsyncProxy)
-                .GetMethods(SR.BindingFlags.Static | SR.BindingFlags.Public)
-                .First(x => x.Name == "TaskToObservable"));
 
             // method
             HttpClient_SendAsync = Module.ImportMethod<HttpClient>(nameof(HttpClient.SendAsync), typeof(HttpRequestMessage));
@@ -193,8 +197,6 @@ namespace Rest.Fody.Weaving
             {
                 returnType = (m.ReturnType as GenericInstanceType).GenericArguments[0];
                 returnTypeSrc = returnType.AsType();
-
-                Logger.Log("Return type:  " + returnTypeSrc.FullName);
             }
             else
             {
@@ -261,9 +263,8 @@ namespace Rest.Fody.Weaving
 
                 m.DeclaringType.Methods.Add(cb);
 
-                var ctor = Module.Import(typeof(Func<,>).MakeGenericType(genType, returnTypeSrc)
-                    .GetConstructors().First());
-                
+                var ctor = Module.Import(typeof(Func<,>).MakeGenericType(genType, returnTypeSrc).GetConstructors().First());
+
                 il.Emit(OpCodes.Call, genType == typeof(Task<string>)
                     ? Proxy_GetContentString
                     : Proxy_GetContentByteArray);               // Task<HttpResponseMessage> -> Task<...>
@@ -274,8 +275,8 @@ namespace Rest.Fody.Weaving
             }
 
             // handle IObservable
-            //if (returnType.Is(typeof(IObservable<>)))
-            //    il.Emit(OpCodes.Call, Proxy_TaskToObservable.MakeGenericMethod(returnType));   // it'll already be IObservable<Unit> if returnType == null
+            if (m.ReturnType.Name == "IObservable`1")
+                il.Emit(OpCodes.Call, Module.ImportToObservable(Reactive_TaskObservableExtensionsDef, returnType));
         }
 
         /// <summary>

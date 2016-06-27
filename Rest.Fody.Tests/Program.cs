@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using System.Reactive;
 
 namespace Rest.Fody.Tests
 {
@@ -27,8 +29,19 @@ namespace Rest.Fody.Tests
                     Console.ForegroundColor = ConsoleColor.White;
                     Console.WriteLine(task.Result);
                 }
+            });
 
-                gc.Dispose();
+            System.Reactive.Threading.Tasks.TaskObservableExtensions.ToObservable(new Task(() => { }));
+
+            gc.Say().Subscribe(n =>
+            {
+                Console.WriteLine("HEYA");
+            }, e =>
+            {
+                Console.WriteLine("HEYA");
+            }, () =>
+            {
+                Console.WriteLine("HEYA");
             });
             
             Console.ReadKey();
@@ -44,10 +57,10 @@ namespace Rest.Fody.Tests
 
         [Get("/hello/{something}")]
         [Header("Authorization", "Bearer Something else")]
-        public extern Task<string> Say(string something = "you");
+        public extern IObservable<string> Say(string something = "you");
 
         [Post("/hello/{hey}")]
-        public extern Task<DateTime> SayMore([Alias("hey")] string something, [Body] DateTime date);
+        public extern Task<HttpStatusCode> SayMore([Alias("hey")] string something, [Body] DateTime date);
 
         [RestSerializer]
         public static string Serialize(object o)

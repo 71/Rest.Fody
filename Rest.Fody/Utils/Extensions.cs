@@ -150,6 +150,11 @@ namespace Rest.Fody
                                   select m.MakeGenericMethod(target2)).First());
         }
 
+        public static MethodReference ImportToObservable(this ModuleDefinition module, TypeDefinition toe, TypeReference target)
+        {
+            return module.Import(toe.Methods.First(x => x.Name == "ToObservable" && x.ContainsGenericParameter)).MakeGenericMethod(target);
+        }
+
         public static FieldReference ImportField<T, TField>(ModuleDefinition module, Expression<Func<T, TField>> ex)
         {
             MemberExpression dp = ex.Body as MemberExpression;

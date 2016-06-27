@@ -34,8 +34,16 @@ namespace Rest.Fody
         // An instance of Mono.Cecil.ModuleDefinition for processing.
         public ModuleDefinition ModuleDefinition { get; set; }
 
+        // An instance of Mono.Cecil.IAssemblyResolver for resolving assembly references.
+        public IAssemblyResolver AssemblyResolver { get; set; }
+
         // Will contain the full path of the target assembly.
         public string AssemblyFilePath { get; set; }
+
+        // Will contain a semicomma delimetered string that contains 
+        // all the references for the target project. 
+        // A copy of the contents of the @(ReferencePath). OPTIONAL
+        public string References { get; set; }
 
         public Assembly ExecutingAssembly { get; set; }
         public Assembly ReferencedAssembly { get; set; }
@@ -66,6 +74,35 @@ namespace Rest.Fody
         //   * Else, throw.
         public void Execute()
         {
+            // load assemblies
+            using (FileStream fs = Utils.WaitOpenFile(AssemblyFilePath, 1000))
+            {
+                byte[] data = new byte[fs.Length];
+                fs.Read(data, 0, data.Length);
+                ReferencedAssembly = Assembly.Load(data);
+            }
+
+            var references = References.Split(';');
+            Container.Register(ReferencedAssembly);
+            Container.Register(ReferencedAssembly.GetReferencedAssemblies().Select(a =>
+            {
+                try
+                {
+                    return Assembly.Load(a);
+                }
+                catch (Exception)
+                {
+                    using (FileStream fs = Utils.WaitOpenFile(references.First(x => x.Contains(a.Name)), 1000))
+                    {
+                        byte[] data = new byte[fs.Length];
+                        fs.Read(data, 0, data.Length);
+                        return Assembly.Load(data);
+                    }
+                }
+            }).ToArray());
+            Container.Register<Type[]>(ReferencedAssembly.SafeGetTypes().Concat(Container.Resolve<Assembly[]>().SelectMany(x => x.SafeGetTypes())).ToArray());
+
+
             // registration
             Container.Register(ModuleDefinition);
             Container.Register(new WeavingOptions { });
@@ -84,18 +121,6 @@ namespace Rest.Fody
 
             Container.Register(cw);
             Container.Register(mw);
-
-            // load assemblies
-            using (FileStream fs = Utils.WaitOpenFile(AssemblyFilePath, 1000))
-            {
-                byte[] data = new byte[fs.Length];
-                fs.Read(data, 0, data.Length);
-                ReferencedAssembly = Assembly.Load(data);
-            }
-
-            Container.Register(ReferencedAssembly);
-            Container.Register(ReferencedAssembly.GetReferencedAssemblies().Select(a => Assembly.Load(a)).ToArray());
-            Container.Register(ReferencedAssembly.SafeGetTypes().Concat(Container.Resolve<Assembly[]>().SelectMany(x => x.SafeGetTypes())).ToArray());
 
 
             // stats

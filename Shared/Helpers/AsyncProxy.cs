@@ -66,33 +66,5 @@ namespace Rest.Fody.Helpers
             return (await task).StatusCode;
         }
         #endregion
-
-        #region ToObservable
-        private static MethodInfo toObservable;
-        private static MethodInfo ToObservable
-        {
-            get
-            {
-                if (toObservable == null)
-                {
-                    toObservable = Type.GetType("System.Reactive.Threading.Tasks.TaskObservableExtensions")
-                        ?.GetRuntimeMethod("ToObservable`1", new Type[] { typeof(Task<>) });
-
-                    if (toObservable == null)
-                        throw new Exception("Could not find method System.Reactive.Threading.Tasks.TaskObservableExtensions.ToObservable<T> to convert Task<T> to IObservable<T>.");
-                }
-
-                return toObservable;
-            }
-        }
-
-        /// <summary>
-        /// Returns a new <see cref="IObservable{T}"/>.
-        /// </summary>
-        public static object TaskToObservable<T>(Task<T> task)
-        {
-            return toObservable.MakeGenericMethod(typeof(T)).Invoke(null, new object[] { task });
-        }
-        #endregion
     }
 }
