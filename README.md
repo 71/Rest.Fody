@@ -127,7 +127,7 @@ public class API
 ```
 Headers can be specified on both classes, methods and parameters:
 - On classes, `[Header(name)]` will throw, and `[Header(name, value)]` will add a default header.
-- On methods, `[Header(name)]` will remove a default header, and `[Header(name, value)]` will override or add a new header.
+- On methods, `[Header(name)]` will throw, and `[Header(name, value)]` will override or add a new header.
 - On parameters, `[Header(name)]` will override or add a new header, and `[Header(name, value)]` will throw.
 
 **Note**: Default headers specified on a class will be ignored if the class provides its own `HttpClient`.  
