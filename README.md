@@ -2,9 +2,6 @@
 A [Fody](https://github.com/Fody/Fody) addin, heavily inspired by [Refit](https://github.com/paulcbetts/refit) and [RestEase](https://github.com/canton7/RestEase).  
 Thankfully, the source code for [ReactiveUI.Fody](https://github.com/kswoll/ReactiveUI.Fody) was easy to understand, and greatly helped me.
 
-## Disclaimer
-Right now, it **doesn't** work. It should be working (but *not* production-ready) within a few days.
-
 ## Basic syntax
 ````csharp
 [ServiceFor("http://example.com/api/v2")]
@@ -57,7 +54,7 @@ With the `[ServiceFor(URL)]` attribute, it is also possible to specify custom he
 [Get("/")]
 public extern Task CheckInternetConnection();
 ```
-A request must be marked `extern`, and return either a `Task`, a `Task<T>`, or any object whose base class is `Task`.  
+A request must be marked `extern`, and return either a `Task`, a `Task<T>`, or a `IObservable<T>` (in which case `System.Reactive.Linq` must be referenced).  
 On failure, a request will throw a `RestException`, which contains a `HttpResponseMessage`.
 
 ### Deserialization / Serialization
