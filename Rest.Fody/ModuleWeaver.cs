@@ -173,7 +173,7 @@ namespace Rest.Fody
                 else if (attr.Name == "ThrowRestExceptionOnInternetError")
                     opts.ThrowRestExceptionOnInternetError = attr.Value.Equals("true", StringComparison.InvariantCultureIgnoreCase);
             }
-            Logger.Log(opts.ToString());
+            Logger.Log(opts.ToString(), true);
             Container.Register(opts);
 
             var Proxy_ThrowOnError = ModuleDefinition.ImportField<AsyncProxy>(nameof(AsyncProxy.ThrowOnError));
