@@ -34,7 +34,13 @@ namespace Rest.Fody.Helpers
         /// <param name="value">The value of the query, on which <see cref="object.ToString"/> will be called.</param>
         public MessageProxy AddQuery(string name, object value)
         {
-            querymap[name] = value.ToString();
+            if (value is IDictionary<string, object>)
+            {
+                foreach (var kvp in ((IDictionary<string, object>)value))
+                    AddQuery(kvp.Key, kvp.Value);
+            }
+            else
+                querymap[name] = value.ToString();
             return this;
         }
 
