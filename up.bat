@@ -1,13 +1,17 @@
-
+@ECHO	OFF
 REM  	UPDATE NUGET PACKAGE
 
-@ECHO	OFF
 SET	MSB="C:\Program Files (x86)\MSBuild\14.0\Bin\msbuild.exe"
 
-MKDIR 	nuget
+MKDIR 	nuget>nul
+MKDIR	nuget\lib\portable-net45+netcore45+win8+wp8+MonoAndroid+Xamarin.iOS10+MonoTouch>nul
 
-%MSB%	Rest.Fody.sln /property:Configuration=Release;OutDir=..\nuget	>nul
-COPY	Rest.Fody.nuspec nuget						>nul
-NUGET	pack nuget\Rest.Fody.nuspec  -OutputDirectory .			>nul
+%MSB%	Rest.Fody\Rest.Fody.csproj /property:Configuration=Release;OutDir=..\nuget>nul
+%MSB%	Rest.Fody.Portable\Rest.Fody.Portable.csproj /property:Configuration=Release;OutDir=..\nuget\lib>nul
 
-RMDIR	nuget
+COPY	Rest.Fody.nuspec nuget>nul
+COPY	nuget\lib\Rest.Fody.Portable\*.* "nuget\lib\portable-net45+netcore45+win8+wp8+MonoAndroid+Xamarin.iOS10+MonoTouch">nul
+RMDIR	nuget\lib\Rest.Fody.Portable /S /Q>nul
+
+NUGET	pack nuget\Rest.Fody.nuspec  -OutputDirectory .>nul
+RMDIR	nuget /S /Q>nul

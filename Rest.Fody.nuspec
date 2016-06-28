@@ -1,19 +1,27 @@
 <?xml version="1.0"?>
 <package >
   <metadata>
+  
     <id>Rest.Fody</id>
-    <version>1.0.0</version>
-    <authors>aej</authors>
-    <owners>aej</owners>
+    <title>Rest.Fody</title>
+    <version>1.0.3</version>
+    <authors>Jee</authors>
+    <owners>Jee</owners>
     <licenseUrl>http://www.opensource.org/licenses/mit-license.php</licenseUrl>
     <projectUrl>https://github.com/0xG/Rest.Fody</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <description>A multi-platform REST client powered by Fody, and heavily inspired by paulcbetts's Refit and canton7's RestEase</description>
-    <releaseNotes>First release.</releaseNotes>
-    <copyright>Copyright © Gregoire GEIS 2016</copyright>
+    <description>A multi-platform REST client powered by Fody, and heavily inspired by paulcbetts's Refit and canton7's RestEase. Supports Rx's IObservable and Task.</description>
+    <summary>A multi-platform REST client powered by Fody, and heavily inspired by paulcbetts's Refit and canton7's RestEase</summary>
+    <releaseNotes>Fixed dependencies.</releaseNotes>
+    <copyright>Copyright ï¿½ Jee 2016</copyright>
     <tags>fody rest http</tags>
+    
     <dependencies>
-      <dependency id="Fody" version="1.0" />
+      <dependency id="Fody" version="1.29.4" />
     </dependencies>
+    <frameworkAssemblies>
+      <frameworkAssembly assemblyName="System.Net.Http" targetFramework="portable-net45+netcore45+win8+wp8+MonoAndroid+Xamarin.iOS10+MonoTouch" />
+    </frameworkAssemblies>
+    
   </metadata>
 </package>

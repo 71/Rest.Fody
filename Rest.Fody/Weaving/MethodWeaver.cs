@@ -463,10 +463,11 @@ namespace Rest.Fody.Weaving
                 CustomAttribute query = p.GetAttr<QueryAttribute>();
                 if (query != null)
                 {
-                    if (query.ConstructorArguments[0].Value == null)
-                        throw m.Message($"Parameters for [Query] mustn't be null.");
+                    string name = query.HasConstructorArguments
+                        ? (string)query.ConstructorArguments[0].Value
+                        : p.Name;
 
-                    il.Emit(OpCodes.Ldstr, (string)query.ConstructorArguments[0].Value);
+                    il.Emit(OpCodes.Ldstr, name);
                     il.Emit(OpCodes.Ldarg_S, i);
                     il.Emit(OpCodes.Box, p.ParameterType);
                     il.Emit(OpCodes.Callvirt, Proxy_AddQuery);

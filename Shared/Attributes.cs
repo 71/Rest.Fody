@@ -112,6 +112,11 @@ namespace Rest
         {
             this.Name = name;
         }
+
+        public QueryAttribute()
+        {
+            this.Name = null;
+        }
     }
 
     /// <summary>
