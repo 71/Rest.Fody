@@ -24,7 +24,7 @@ All the weaving code.
 All the attributes.
 
 ### Rest.Fody.Tests
-Some random tests ; TODO.
+Some tests, with [Shouldly](https://github.com/shouldly/shouldly).
 
 ### Shared
 Code shared between Rest.Fody.Portable and Rest.Fody.
@@ -102,8 +102,8 @@ public extern Task<Todo> SaveTodo(string todoId);
 public extern Task<Todo> DeleteTodo([Alias("todoId")] string id, [Query] string @if);
 ```
 Four ways to specify query parameters:
-- `[Query] T obj` or `[Query(name)] T obj`
-- `[Query] IDictionary<string, T> query` or `[Query(name)] IDictionary<string, T> query`
+- `[Query] object obj` or `[Query(name)] object obj`
+- `[Query] IDictionary<string, object> query` or `[Query(name)] IDictionary<string, object> query`
 
 If the name of the query starts with a '@', it will be removed.
 
