@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Reactive;
+using System.Reactive.Threading.Tasks;
 
 namespace Rest.Fody.Tests
 {
@@ -12,43 +13,21 @@ namespace Rest.Fody.Tests
     {
         static void Main(string[] args)
         {
-            //HttpClient cl = new HttpClient();
-            //Uri i = new Uri("http://example.com");
-
-            GoodClient gc = new GoodClient();
-
-            //new Task<string>(() => "").ContinueWith<WTFClass<DateTime>>(task =>
-            //{
-            //    return null;
-            //});
-
-            gc.SayMore("heyyy", DateTime.Now).ContinueWith(task =>
+            Task.Run(async () =>
             {
-                if (task.IsFaulted)
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine(task.Exception.Message);
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine(task.Result);
-                }
+                ReactiveTests.BeginTests();
+                await RequestsTests.BeginTests();
+                await HttpClientTests.BeginTests();
+            }).ToObservable().Subscribe(u =>
+            {
+                Console.WriteLine($"Test successful.");
+            }, ex =>
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine(ex.Message);
+                Console.ResetColor();
             });
 
-            //System.Reactive.Threading.Tasks.TaskObservableExtensions.ToObservable(new Task(() => { }));
-
-            //gc.Say().Subscribe(n =>
-            //{
-            //    Console.WriteLine("HEYA");
-            //}, e =>
-            //{
-            //    Console.WriteLine("HEYA");
-            //}, () =>
-            //{
-            //    Console.WriteLine("HEYA");
-            //});
-            
             Console.ReadKey();
         }
     }
@@ -60,9 +39,9 @@ namespace Rest.Fody.Tests
         [Get("/")]
         public extern Task<WTFClass<DateTime>> SayHey();
 
-        //[Get("/hello/{something}")]
-        //[Header("Authorization", "Bearer Something else")]
-        //public extern IObservable<string> Say(string something = "you");
+        [Get("/hello/{something}")]
+        [Header("Authorization", "Bearer Something else")]
+        public extern IObservable<string> Say(string something = "you");
 
         [Post("/hello/{hey}")]
         public extern Task<HttpStatusCode> SayMore([Alias("hey")] string something, [Body] DateTime date);

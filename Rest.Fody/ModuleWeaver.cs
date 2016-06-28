@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Mono.Cecil;
+using Mono.Cecil.Cil;
 using Rest.Fody.Helpers;
 using Rest.Fody.Weaving;
 using TinyIoC;
@@ -94,21 +95,33 @@ namespace Rest.Fody
         //   * Else, throw.
         public void Execute()
         {
+            // load logger
+            Logger = new Logger(LogDebug, LogInfo);
+            Container.Register(Logger);
+
+
             // load assemblies
+            var references = References.Split(';');
+            var types = new List<Type>();
+
             using (FileStream fs = Utils.WaitOpenFile(AssemblyFilePath, 1000))
             {
                 byte[] data = new byte[fs.Length];
                 fs.Read(data, 0, data.Length);
+
                 ReferencedAssembly = Assembly.Load(data);
+                Container.Register(ReferencedAssembly, ReferencedAssembly.FullName);
+
+                types.AddRange(ReferencedAssembly.SafeGetTypes());
             }
 
-            var references = References.Split(';');
-            Container.Register(ReferencedAssembly);
-            Container.Register(ReferencedAssembly.GetReferencedAssemblies().Select(a =>
+            foreach (AssemblyName a in ReferencedAssembly.GetReferencedAssemblies())
             {
+                Assembly resolved = null;
+
                 try
                 {
-                    return Assembly.Load(a);
+                    resolved = Assembly.Load(a);
                 }
                 catch (Exception)
                 {
@@ -116,21 +129,26 @@ namespace Rest.Fody
                     {
                         byte[] data = new byte[fs.Length];
                         fs.Read(data, 0, data.Length);
-                        return Assembly.Load(data);
+                        resolved = Assembly.Load(data);
                     }
                 }
-            }).ToArray());
-            Container.Register(ReferencedAssembly.SafeGetTypes().Concat(Container.Resolve<Assembly[]>().SelectMany(x => x.SafeGetTypes())).ToArray());
+                finally
+                {
+                    Logger.Log($"Loaded assembly {resolved.GetName().Name}");
+                    Container.Register(resolved, resolved.FullName);
 
+                    types.AddRange(resolved.SafeGetTypes());
+                }
+            }
+
+            Container.Register(types.ToArray());
+            
 
             // registration
             Container.Register(ModuleDefinition);
 
             ClassWeaver cw = new ClassWeaver();
             MethodWeaver mw = new MethodWeaver();
-
-            Logger = new Logger(LogDebug, LogInfo);
-            Container.Register(Logger);
 
             Container.BuildUp(cw);
             Container.BuildUp(mw);
@@ -140,21 +158,30 @@ namespace Rest.Fody
 
             Container.Register(cw);
             Container.Register(mw);
-
             
+            //foreach (var t in ModuleDefinition.GetTypes()) Logger.Log("[TypeDef] " + t.FullName);
+            //foreach (var t in ModuleDefinition.GetTypeReferences()) Logger.Log("[TypeRef] " + t.FullName);
+            //foreach (var t in ModuleDefinition.GetMemberReferences()) Logger.Log("[Member] " + t.FullName);
+
+
             // options
             WeavingOptions opts = new WeavingOptions();
             foreach (XAttribute attr in Config.Attributes())
             {
                 if (attr.Name == "AddHeadersToAlreadyExistingHttpClient")
                     opts.AddHeadersToAlreadyExistingHttpClient = attr.Value.Equals("true", StringComparison.InvariantCultureIgnoreCase);
-                else if (attr.Name == "SupportsMultiBody")
-                    opts.SupportsMultiBody = attr.Value.Equals("true", StringComparison.InvariantCultureIgnoreCase);
+                else if (attr.Name == "ThrowRestExceptionOnInternetError")
+                    opts.ThrowRestExceptionOnInternetError = attr.Value.Equals("true", StringComparison.InvariantCultureIgnoreCase);
             }
             Logger.Log(opts.ToString());
             Container.Register(opts);
 
+            var Proxy_ThrowOnError = ModuleDefinition.ImportField<AsyncProxy>(nameof(AsyncProxy.ThrowOnError));
 
+            ModuleDefinition.ImportType<AsyncProxy>().Resolve().Methods.First(x => x.IsConstructor).Body.EmitToBeginning(
+                Instruction.Create(opts.ThrowRestExceptionOnInternetError ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0),
+                Instruction.Create(OpCodes.Stsfld, Proxy_ThrowOnError)
+            );
 
             // stats
             cw.RegisteredClass += (TypeDefinition t) =>

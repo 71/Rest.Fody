@@ -16,22 +16,11 @@ namespace Rest.Fody.Helpers
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class MessageProxy
     {
-        private byte[] serializeBuf(object o)
-        {
-            throw new NotImplementedException();
-        }
-
-        private string serializeStr(object o)
-        {
-            throw new NotImplementedException();
-        }
-
         private string rawpath;
         private string endpath;
 
         private HttpRequestMessage msg = new HttpRequestMessage();
         private IDictionary<string, object> querymap = new Dictionary<string, object>();
-
        
         public MessageProxy(HttpMethod method, string path)
         {

@@ -26,6 +26,7 @@ namespace Rest.Fody.Weaving
         // methods
         private MethodReference HttpClient_SendAsync;
         private MethodReference CancellationToken_None;
+        private MethodReference Task_Start;
 
         // proxy
         private TypeReference ProxyRef;
@@ -52,11 +53,12 @@ namespace Rest.Fody.Weaving
 
         public override void ImportNecessaryReferences()
         {
-            var reactiveLinq = Module.AssemblyReferences.FirstOrDefault(x => x.Name.StartsWith("System.Reactive.Linq"));
-
             // types
             ProxyRef = Module.ImportType<MessageProxy>();
-            Reactive_TaskObservableExtensionsDef = new TypeReference("System.Reactive.Threading.Tasks", "TaskObservableExtensions", Module, reactiveLinq)?.Resolve();
+
+            TypeReference TaskObservableExt;
+            if (Module.TryGetTypeReference("System.Reactive.Threading.Tasks.TaskObservableExtensions", out TaskObservableExt))
+                Reactive_TaskObservableExtensionsDef = TaskObservableExt.Resolve();
 
             // ctor
             Proxy_Ctor = Module.ImportCtor<MessageProxy>(typeof(HttpMethod), typeof(string));
@@ -64,6 +66,7 @@ namespace Rest.Fody.Weaving
             // method
             HttpClient_SendAsync = Module.ImportMethod<HttpClient>(nameof(HttpClient.SendAsync), typeof(HttpRequestMessage), typeof(CancellationToken));
             CancellationToken_None = Module.ImportMethod<CancellationToken>("get_None");
+            Task_Start = Module.ImportMethod<Task>("Start");
 
             // proxy methods
             Proxy_Compile = Module.ImportMethod<MessageProxy>(nameof(MessageProxy.Compile));
@@ -152,9 +155,11 @@ namespace Rest.Fody.Weaving
             
             method.Body.Emit(il =>
             {
-                il.Emit(OpCodes.Ldarg_0);                   // this
-                il.Emit(OpCodes.Call, httpClientGetter);    // load this.HttpClient onto the stack
-                
+                if (!method.ReturnType.Is<HttpRequestMessage>())
+                {
+                    il.Emit(OpCodes.Ldarg_0);                   // this
+                    il.Emit(OpCodes.Call, httpClientGetter);    // load this.HttpClient onto the stack
+                }
                 il.Emit(OpCodes.Call, httpMethodGetter);    // load the static Method property of the attribute
                 il.Emit(OpCodes.Ldstr, path);               // load path onto the stack
                 il.Emit(OpCodes.Newobj, Proxy_Ctor);        // create proxy
@@ -179,8 +184,13 @@ namespace Rest.Fody.Weaving
 
                 if (method.HasParameters)
                     RunParameters(method, il, serStr, serBuf, out tokenIndex);  // edit request to match parameters (query, alias, body, etc)
-
+                
                 il.Emit(OpCodes.Callvirt, Proxy_Compile);               // compile proxy to HttpRequestMessage
+                if (method.ReturnType.Is<HttpRequestMessage>())
+                {
+                    il.Emit(OpCodes.Ret);
+                    return;
+                }
 
                 if (tokenIndex > 0)
                     il.Emit(OpCodes.Ldarg_S, tokenIndex);               // if provided, pass the cancellation token
@@ -228,7 +238,7 @@ namespace Rest.Fody.Weaving
             {
                 GenericInstanceMethod deser;
                 bool isStatic;
-                TypeReference genType;
+                GenericInstanceType genType;
                 Type genTypeSrc;
                 MethodReference resGetter;
                 MethodReference contentGetter;
@@ -252,7 +262,9 @@ namespace Rest.Fody.Weaving
                 else
                     throw m.Message("No serializer / deserializer found.");
 
-                genType = Module.Import(genTypeSrc);
+                genType = genTypeSrc == typeof(Task<string>)
+                    ? Module.GetReference("System.Threading.Tasks.Task`1").MakeGenericInstanceType(Module.TypeSystem.String)
+                    : Module.GetReference("System.Threading.Tasks.Task`1").MakeGenericInstanceType(Module.GetReference("System.Array").MakeGenericInstanceType(Module.TypeSystem.Byte));
 
                 MethodDefinition cb = new MethodDefinition($"${m.Name}_cb", MethodAttributes.Private, returnType);
                 cb.Parameters.Add(new ParameterDefinition(Module.Import(genType)));
@@ -335,7 +347,7 @@ namespace Rest.Fody.Weaving
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldftn, cb);                     // this.cb
                 il.Emit(OpCodes.Newobj, ctor);                  // new Func<Task<...>, T>(cb)
-                il.Emit(OpCodes.Call, Module.ImportContinueWith(genTypeSrc, returnTypeSrc));
+                il.Emit(OpCodes.Callvirt, Module.ImportContinueWith(genTypeSrc, returnTypeSrc));
             }
 
             // handle IObservable
@@ -343,7 +355,7 @@ namespace Rest.Fody.Weaving
             {
                 if (Reactive_TaskObservableExtensionsDef == null)
                     throw m.Message("Cannot find type System.Reactive.Threading.Tasks.TaskObservableExtensions.");
-
+                
                 il.Emit(OpCodes.Call, Module.ImportToObservable(Reactive_TaskObservableExtensionsDef, returnType));
             }
         }

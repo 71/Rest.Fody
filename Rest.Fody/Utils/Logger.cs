@@ -17,6 +17,8 @@ namespace Rest.Fody
         private Action<string> logsInfo;
         private Action<string> logsImportant;
 
+        private object lockObj = Guid.NewGuid();
+
         public Logger(Action<string> info, Action<string> important)
         {
             layers = new Stack<string>();
@@ -32,12 +34,15 @@ namespace Rest.Fody
 
         private void InternalLog(string s, bool important)
         {
-            string log = layers.Count > 0
-                ? Enumerable.Range(0, layers.Count).Aggregate("", (str, c) => str += "  ") + $"[{String.Join(" > ", layers.Reverse())}] {s}"
-                : s;
+            lock (lockObj)
+            {
+                string log = layers.Count > 0
+                    ? Enumerable.Range(0, layers.Count).Aggregate("", (str, c) => str += "  ") + $"[{String.Join(" > ", layers.Reverse())}] {s}"
+                    : s;
 
-            if (important) logsImportant(log);
-            else logsInfo(log);
+                if (important) logsImportant(log);
+                else logsInfo(log);
+            }
         }
 
         /// <summary>
@@ -45,9 +50,12 @@ namespace Rest.Fody
         /// </summary>
         public void Region(string name, Action action)
         {
-            layers.Push(name);
-            action();
-            layers.Pop();
+            lock (lockObj)
+            {
+                layers.Push(name);
+                action();
+                layers.Pop();
+            }
         }
 
         /// <summary>
@@ -55,10 +63,14 @@ namespace Rest.Fody
         /// </summary>
         public T Region<T>(string step, Func<T> action)
         {
-            layers.Push(step);
-            T res = action();
-            layers.Pop();
-            return res;
+
+            lock (lockObj)
+            {
+                layers.Push(step);
+                T res = action();
+                layers.Pop();
+                return res;
+            }
         }
 
         /// <summary>

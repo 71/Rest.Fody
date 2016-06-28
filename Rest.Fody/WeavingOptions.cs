@@ -17,11 +17,19 @@ namespace Rest.Fody
         /// </summary>
         public bool AddHeadersToAlreadyExistingHttpClient = false;
 
+        /// <summary>
+        /// Throws <see cref="RestException"/> instead of <see cref="System.Net.Http.HttpRequestException"/> on
+        /// connection error. <see cref="RestException."/>
+        /// </summary>
+        public bool ThrowRestExceptionOnInternetError = false;
+
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();
 
+            sb.AppendLine("SETTINGS:");
             sb.AppendLine($"AddHeadersToAlreadyExistingHttpClient: {AddHeadersToAlreadyExistingHttpClient}");
+            sb.AppendLine($"ThrowRestExceptionOnInternetError: {ThrowRestExceptionOnInternetError}");
 
             return sb.ToString();
         }

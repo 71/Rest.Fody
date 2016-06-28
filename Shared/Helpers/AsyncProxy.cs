@@ -18,12 +18,32 @@ namespace Rest.Fody.Helpers
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class AsyncProxy
     {
+        public readonly static bool ThrowOnError;
+
         #region Status codes
-        private static HttpResponseMessage CheckSuccess(HttpResponseMessage msg)
+        private static async Task<HttpResponseMessage> CheckSuccess(Task<HttpResponseMessage> msgTask)
         {
-            if (!msg.IsSuccessStatusCode)
-                throw new RestException(msg);
-            return msg;
+            if (ThrowOnError)
+            {
+                try
+                {
+                    var msg = await msgTask;
+                    if (!msg.IsSuccessStatusCode)
+                        throw new RestException(msg);
+                    return msg;
+                }
+                catch (HttpRequestException e)
+                {
+                    throw new RestException(e.Message);
+                }
+            }
+            else
+            {
+                var msg = await msgTask;
+                if (!msg.IsSuccessStatusCode)
+                    throw new RestException(msg);
+                return msg;
+            }
         }
 
         /// <summary>
@@ -32,7 +52,7 @@ namespace Rest.Fody.Helpers
         /// <exception cref="RestException">The HTTP request failed (300 > <see cref="HttpStatusCode"/> > 199)</exception>
         public static async Task<string> CallString(Task<HttpResponseMessage> task)
         {
-            return await CheckSuccess(await task).Content.ReadAsStringAsync();
+            return await (await CheckSuccess(task)).Content.ReadAsStringAsync();
         }
 
         /// <summary>
@@ -41,7 +61,7 @@ namespace Rest.Fody.Helpers
         /// <exception cref="RestException">The HTTP request failed (300 > <see cref="HttpStatusCode"/> > 199)</exception>
         public static async Task<Stream> CallStream(Task<HttpResponseMessage> task)
         {
-            return await CheckSuccess(await task).Content.ReadAsStreamAsync();
+            return await (await CheckSuccess(task)).Content.ReadAsStreamAsync();
         }
 
         /// <summary>
@@ -50,7 +70,7 @@ namespace Rest.Fody.Helpers
         /// <exception cref="RestException">The HTTP request failed (300 > <see cref="HttpStatusCode"/> > 199)</exception>
         public static async Task<byte[]> CallByteArray(Task<HttpResponseMessage> task)
         {
-            return await CheckSuccess(await task).Content.ReadAsByteArrayAsync();
+            return await (await CheckSuccess(task)).Content.ReadAsByteArrayAsync();
         }
 
         /// <summary>
@@ -58,7 +78,13 @@ namespace Rest.Fody.Helpers
         /// </summary>
         public static async Task<HttpResponseMessage> CallResponse(Task<HttpResponseMessage> task)
         {
-            return await task;
+            if (ThrowOnError)
+            {
+                try { return await task; }
+                catch (HttpRequestException e) { throw new RestException(e.Message); }
+            }
+            else
+                return await task;
         }
 
         /// <summary>
@@ -66,7 +92,13 @@ namespace Rest.Fody.Helpers
         /// </summary>
         public static async Task<HttpStatusCode> CallStatusCode(Task<HttpResponseMessage> task)
         {
-            return (await task).StatusCode;
+            if (ThrowOnError)
+            {
+                try { return (await task).StatusCode; }
+                catch (HttpRequestException e) { throw new RestException(e.Message); }
+            }
+            else
+                return (await task).StatusCode;
         }
         #endregion
     }

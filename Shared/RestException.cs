@@ -24,9 +24,21 @@ namespace Rest
         /// </summary>
         public HttpStatusCode StatusCode { get { return ResponseMessage.StatusCode; } }
 
+        /// <summary>
+        /// Indicates that the error was caused by the network (no internet connection), and not
+        /// by the response (bad status code).
+        /// </summary>
+        public bool IsError { get; private set; }
+
         internal RestException(HttpResponseMessage msg) : base($"{(int)msg.StatusCode} - {msg.ReasonPhrase}")
         {
             ResponseMessage = msg;
+            IsError = false;
+        }
+
+        internal RestException(string msg) : base(msg)
+        {
+            IsError = true;
         }
 
         public override string ToString()
