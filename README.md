@@ -137,8 +137,9 @@ Headers can be specified on both classes, methods and parameters:
 **Note**: A `[Headers]` attribute is valid on parameters that implements `IDictionary<string, string>`.
 
 ## Options
-In `FodyWeaver.xml`, options can be passed to Rest.Fody via XML.  
-- **AddHeadersToAlreadyExistingHttpClient** (Default: `False`): Add ``[Header]`` on `HttpClient`, even if it is provided by the user.
+In `FodyWeaver.xml`, options can be passed to Rest.Fody via XML (sorry, those options have very long name).  
+- **AddHeadersToAlreadyExistingHttpClient** (Default: `False`): Add the headers provided by ``[Header] class`` to `HttpClient`, even if it is provided by the user.
+- **ThrowRestExceptionOnInternetError** (Default: `False`): On internet error (can't connect, timeout, ...), throw `RestException` instead of `HttpRequestException`. `RestException.IsError` will be set to true, and only `ResponseMessage` will be `null`.
 
 ## Misc
 - Yes, you can do `[Get("http://full.url/user")]`.
