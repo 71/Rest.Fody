@@ -12,6 +12,9 @@ public class API
 }
 ````
 
+## How-to Install
+#### `Install-Package Rest.Fody`
+
 ## Source structure
 
 ### Rest.Fody
