@@ -12,9 +12,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Attributes.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helpers\AsyncProxy.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helpers\MessageProxy.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Properties\AssemblyInfo.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)RestException.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="$(MSBuildThisFileDirectory)Properties\" />
   </ItemGroup>
 </Project>
