@@ -21,114 +21,117 @@ namespace Rest
         }
     }
 
-    /// <summary>
-    /// Indicates a <see cref="HttpMethod.Get"/> request.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
     public class GetAttribute : HttpMethodAttribute
     {
         public static new HttpMethod Method { get { return HttpMethod.Get; } }
 
+        /// <summary>
+        /// Make a <see cref="HttpMethod.Get"/> request.
+        /// </summary>
         public GetAttribute(string path) : base(path) { }
     }
 
-    /// <summary>
-    /// Indicates a <see cref="HttpMethod.Post"/> request.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
     public class PostAttribute : HttpMethodAttribute
     {
         public static new HttpMethod Method { get { return HttpMethod.Post; } }
 
+        /// <summary>
+        /// Make a <see cref="HttpMethod.Post"/> request.
+        /// </summary>
         public PostAttribute(string path) : base(path) { }
     }
 
-    /// <summary>
-    /// Indicates a <see cref="HttpMethod.Put"/> request.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
     public class PutAttribute : HttpMethodAttribute
     {
         public static new HttpMethod Method { get { return HttpMethod.Put; } }
 
+        /// <summary>
+        /// Make a <see cref="HttpMethod.Put"/> request.
+        /// </summary>
         public PutAttribute(string path) : base(path) { }
     }
 
-    /// <summary>
-    /// Indicates a <see cref="HttpMethod.Delete"/> request.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
     public class DeleteAttribute : HttpMethodAttribute
     {
         public static new HttpMethod Method { get { return HttpMethod.Delete; } }
 
+        /// <summary>
+        /// Make a <see cref="HttpMethod.Delete"/> request.
+        /// </summary>
         public DeleteAttribute(string path) : base(path) { }
     }
 
-    /// <summary>
-    /// Indicates a PATCH request.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
     public class PatchAttribute : HttpMethodAttribute
     {
         public static new HttpMethod Method { get { return new HttpMethod("Patch"); } }
 
+        /// <summary>
+        /// Make a PATCH request.
+        /// </summary>
         public PatchAttribute(string path) : base(path) { }
     }
 
-    /// <summary>
-    /// Indicates a <see cref="HttpMethod.Head"/> request.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
     public class HeadAttribute : HttpMethodAttribute
     {
         public static new HttpMethod Method { get { return HttpMethod.Head; } }
 
+        /// <summary>
+        /// Make a <see cref="HttpMethod.Head"/> request.
+        /// </summary>
         public HeadAttribute(string path) : base(path) { }
     }
     #endregion
 
     #region Alias & Body & Query
-    /// <summary>
-    /// Indicates a HTTP request message body, that will be serialized and set to <see cref="HttpRequestMessage.Content"/>.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
     public class BodyAttribute : Attribute
     {
+        /// <summary>
+        /// Indicates a HTTP request message body, that will be serialized and set to <see cref="HttpRequestMessage.Content"/>.
+        /// </summary>
         public BodyAttribute()
         {
         }
     }
 
-    /// <summary>
-    /// Indicates a HTTP request message query, such as "?id=azerty".
-    /// </summary>
     [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
     public class QueryAttribute : Attribute
     {
         public string Name { get; protected set; }
 
+        /// <summary>
+        /// Indicates a HTTP request message query, such as "?id=azerty".
+        /// </summary>
         public QueryAttribute(string name)
         {
             this.Name = name;
         }
 
+        /// <summary>
+        /// Indicates a HTTP request message query, such as "?id=azerty".
+        /// </summary>
         public QueryAttribute()
         {
             this.Name = null;
         }
     }
 
-    /// <summary>
-    /// Indicates an alias for this parameter. Used when the provided url
-    /// has missing parts, ie "/user/{username}".
-    /// If a parameter is already named username, you can use the alias attribute instead.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
     public class AliasAttribute : Attribute
     {
         public string Name { get; protected set; }
 
+        /// <summary>
+        /// Indicates an alias for this parameter. Used when the provided url
+        /// has missing parts, ie "/user/{username}".
+        /// If a parameter is already named username, you can use the alias attribute instead.
+        /// </summary>
         public AliasAttribute(string name)
         {
             this.Name = name;
@@ -170,6 +173,10 @@ namespace Rest
     [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
     public class HeadersAttribute : Attribute
     {
+        /// <summary>
+        /// Indicates that the given value (must be IDictionary{string,object}) will
+        /// set multiple headers.
+        /// </summary>
         public HeadersAttribute()
         {
         }
@@ -177,19 +184,19 @@ namespace Rest
     #endregion
 
     #region Misc (Service, ServiceFor, RestClient)
-    /// <summary>
-    /// Indicates that this class will be used for HTTP requests.
-    /// Overriden by a <see cref="HttpClient"/> marked with the attribute <see cref="RestClientAttribute"/>.
-    /// </summary>
-    /// <remarks>
-    /// If the <see cref="HttpClient"/> is generated by Rest.Fody and the class implements <see cref="IDisposable"/>,
-    /// the <see cref="HttpClient"/> will be disposed after disposing this class.
-    /// </remarks>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public class ServiceForAttribute : Attribute
     {
         public string Address { get; protected set; }
-        
+
+        /// <summary>
+        /// Indicates that this class will be used for HTTP requests.
+        /// Overriden by a <see cref="HttpClient"/> marked with the attribute <see cref="RestClientAttribute"/>.
+        /// </summary>
+        /// <remarks>
+        /// If the <see cref="HttpClient"/> is generated by Rest.Fody and the class implements <see cref="IDisposable"/>,
+        /// the <see cref="HttpClient"/> will be disposed after disposing this class.
+        /// </remarks>
         /// <param name="address"><see cref="HttpClient.BaseAddress"/></param>
         public ServiceForAttribute(string address)
         {
@@ -197,13 +204,13 @@ namespace Rest
         }
     }
 
-    /// <summary>
-    /// Indicates that this class will be used for HTTP requests.
-    /// Must have a <see cref="HttpClient"/> property marked with the attribute <see cref="RestClientAttribute"/>.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public class ServiceAttribute : Attribute
     {
+        /// <summary>
+        /// Indicates that this class will be used for HTTP requests.
+        /// Must have a <see cref="HttpClient"/> property marked with the attribute <see cref="RestClientAttribute"/>.
+        /// </summary>
         public ServiceAttribute()
         {
         }
@@ -222,26 +229,52 @@ namespace Rest
     #endregion
 
     #region Serializer / Deserializer
-    /// <summary>
-    /// Indicates that this method (static or instance) will be used to serialize
-    /// an object into <see cref="string"/> or <see cref="byte[]"/>.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
     public class RestSerializerAttribute : Attribute
     {
+        /// <summary>
+        /// Indicates that this method (static or instance) will be used to serialize
+        /// an object into <see cref="string"/> or <see cref="byte[]"/>.
+        /// </summary>
         public RestSerializerAttribute()
         {
         }
     }
 
-    /// <summary>
-    /// Indicates that this method (static or instance) will be used to deserialize
-    /// a <see cref="string"/> or <see cref="byte[]"/> into an object.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
     public class RestDeserializerAttribute : Attribute
     {
+        /// <summary>
+        /// Indicates that this method (static or instance) will be used to deserialize
+        /// a <see cref="string"/> or <see cref="byte[]"/> into an object.
+        /// </summary>
         public RestDeserializerAttribute()
+        {
+        }
+    }
+    #endregion
+
+    #region After / Before Hooks
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
+    public class BeforeSendAttribute : Attribute
+    {
+        /// <summary>
+        /// Indicates that this method will be called before sending a request.
+        /// Takes a single parameter: <see cref="HttpRequestMessage"/>.
+        /// </summary>
+        public BeforeSendAttribute()
+        {
+        }
+    }
+    
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
+    public class AfterSendAttribute : Attribute
+    {
+        /// <summary>
+        /// Indicates that this method will be called after receiving a successful response.
+        /// Takes a single parameter: <see cref="HttpResponseMessage"/>.
+        /// </summary>
+        public AfterSendAttribute()
         {
         }
     }

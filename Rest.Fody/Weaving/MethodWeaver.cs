@@ -208,6 +208,9 @@ namespace Rest.Fody.Weaving
         /// </summary>
         private void RunReturnValue(MethodDefinition m, ILProcessor il, MethodDefinition deserStr, MethodDefinition deserBuf)
         {
+            if (!m.ReturnType.Is<Task>() && !m.ReturnType.Is(typeof(IObservable<>)))
+                throw m.Message("Return type must be Task, Task<T> or IObservable<T>.");
+
             Type returnTypeSrc;
             TypeReference returnType;
 
@@ -269,7 +272,7 @@ namespace Rest.Fody.Weaving
                 MethodDefinition cb = new MethodDefinition($"${m.Name}_cb", MethodAttributes.Private, returnType);
                 cb.Parameters.Add(new ParameterDefinition(Module.Import(genType)));
                 cb.Body.Emit(i =>
-                {                    
+                {
                     if (isStatic)
                     {
                         i.Emit(OpCodes.Ldarg_1);
@@ -343,6 +346,8 @@ namespace Rest.Fody.Weaving
 
                 var ctor = Module.Import(typeof(Func<,>).MakeGenericType(genTypeSrc, returnTypeSrc).GetConstructors().First());
 
+                il.Emit(OpCodes.Dup);                           // duplicate Task<HttpResponseMessage>, in order to get value
+                il.Emit(OpCodes.Call, contentGetter);           // Task<HttpResponseMessage> -> Task<string> / Task<byte[]>
                 il.Emit(OpCodes.Call, contentGetter);           // Task<HttpResponseMessage> -> Task<...>
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldftn, cb);                     // this.cb
@@ -465,7 +470,7 @@ namespace Rest.Fody.Weaving
                 {
                     string name = query.HasConstructorArguments
                         ? (string)query.ConstructorArguments[0].Value
-                        : p.Name;
+                        : p.Name.TrimStart('@');
 
                     il.Emit(OpCodes.Ldstr, name);
                     il.Emit(OpCodes.Ldarg_S, i);
@@ -474,8 +479,8 @@ namespace Rest.Fody.Weaving
 
                     continue;
                 }
-                
-                string argName = p.Name;
+
+                string argName = p.Name.TrimStart('@');
 
                 CustomAttribute alias = p.GetAttr<AliasAttribute>();
                 if (alias != null)
