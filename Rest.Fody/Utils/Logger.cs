@@ -8,6 +8,8 @@ namespace Rest.Fody
 {
     internal sealed class Logger
     {
+        public static Logger Instance;
+
         public string Step { get; private set; }
         public IReadOnlyList<string> DoneSteps { get { return done_steps.AsReadOnly(); } }
 
@@ -21,6 +23,8 @@ namespace Rest.Fody
 
         public Logger(Action<string> info, Action<string> important)
         {
+            Instance = this;
+
             layers = new Stack<string>();
             done_steps = new List<string>();
 

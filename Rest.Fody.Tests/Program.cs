@@ -20,7 +20,7 @@ namespace Rest.Fody.Tests
                 await HttpClientTests.BeginTests();
             }).ToObservable().Subscribe(u =>
             {
-                Console.WriteLine($"Test successful.");
+                Console.WriteLine("Test successful.");
             }, ex =>
             {
                 Console.ForegroundColor = ConsoleColor.Red;
@@ -51,8 +51,8 @@ namespace Rest.Fody.Tests
         {
             if (o is DateTime)
                 return ((DateTime)o).ToLongDateString();
-            else
-                return o.ToString();
+
+            return o.ToString();
         }
 
         [RestDeserializer]

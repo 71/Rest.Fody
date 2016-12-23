@@ -13,7 +13,6 @@ using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Rest.Fody.Helpers;
 using Rest.Fody.Weaving;
-using TinyIoC;
 
 namespace Rest.Fody
 {
@@ -69,8 +68,6 @@ namespace Rest.Fody
         public Assembly ExecutingAssembly { get; set; }
         public Assembly ReferencedAssembly { get; set; }
 
-        private TinyIoCContainer Container => TinyIoCContainer.Current;
-
         public ModuleWeaver()
         {
             ExecutingAssembly = Assembly.GetExecutingAssembly();
@@ -94,23 +91,6 @@ namespace Rest.Fody
         {
             // load logger
             Logger = new Logger(LogDebug, LogInfo);
-            Container.Register(Logger);
-            
-            // registration
-            Container.Register(ModuleDefinition);
-
-            ClassWeaver cw = new ClassWeaver();
-            MethodWeaver mw = new MethodWeaver();
-
-            Container.BuildUp(cw);
-            Container.BuildUp(mw);
-
-            cw.ImportNecessaryReferences();
-            mw.ImportNecessaryReferences();
-
-            Container.Register(cw);
-            Container.Register(mw);
-
 
             // options
             WeavingOptions opts = new WeavingOptions();
@@ -121,8 +101,8 @@ namespace Rest.Fody
                 else if (attr.Name == "ThrowRestExceptionOnInternetError")
                     opts.ThrowRestExceptionOnInternetError = attr.Value.Equals("true", StringComparison.InvariantCultureIgnoreCase);
             }
+
             Logger.Log(opts.ToString(), true);
-            Container.Register(opts);
 
             var Proxy_ThrowOnError = ModuleDefinition.ImportField<AsyncProxy>(nameof(AsyncProxy.ThrowOnError));
 
@@ -131,13 +111,19 @@ namespace Rest.Fody
                 Instruction.Create(OpCodes.Stsfld, Proxy_ThrowOnError)
             );
 
+            Weaver.ClassWeaver.Options = Weaver.MethodWeaver.Options = opts;
+            Weaver.ClassWeaver.Module = Weaver.MethodWeaver.Module = ModuleDefinition;
+
+            Weaver.ClassWeaver.ImportNecessaryReferences();
+            Weaver.MethodWeaver.ImportNecessaryReferences();
+
             // stats
-            cw.RegisteredClass += t =>
+            Weaver.ClassWeaver.RegisteredClass += t =>
             {
                 ModifiedTypes++;
             };
 
-            mw.RegisteredMethod += m =>
+            Weaver.MethodWeaver.RegisteredMethod += m =>
             {
                 ModifiedMethods++;
             };
@@ -148,7 +134,7 @@ namespace Rest.Fody
             {
 #if DEBUG
                 foreach (var type in ModuleDefinition.GetTypes())
-                    cw.RunType(type);
+                    Weaver.ClassWeaver.RunType(type);
 #else
                 Parallel.ForEach(ModuleDefinition.GetTypes(), cw.RunType);
 #endif

@@ -58,7 +58,6 @@
   <ItemGroup>
     <Compile Include="ModuleWeaver.cs" />
     <Compile Include="Utils\Logger.cs" />
-    <Compile Include="Utils\TinyIoc.cs" />
     <Compile Include="Utils\Utils.cs" />
     <Compile Include="WeavingOptions.cs" />
     <Compile Include="Weaving\Weaver.cs" />

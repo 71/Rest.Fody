@@ -1,23 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Mono.Cecil;
-using TinyIoC;
+﻿using Mono.Cecil;
+using Rest.Fody.Weaving;
 
 namespace Rest.Fody
 {
     internal abstract class Weaver
     {
-        public WeavingOptions Options { get; set; }
-        public ModuleDefinition Module { get; set; }
-        public Logger Logger { get; set; }
+        public static MethodWeaver MethodWeaver = new MethodWeaver();
+        public static ClassWeaver ClassWeaver = new ClassWeaver();
 
-        protected TinyIoCContainer Container
-        {
-            get { return TinyIoCContainer.Current; }
-        }
+        public ModuleDefinition Module { get; set; }
+        public WeavingOptions Options { get; set; }
+
+        public Logger Logger => Logger.Instance;
 
         public abstract void ImportNecessaryReferences();
     }

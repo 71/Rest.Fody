@@ -12,7 +12,6 @@ using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Cecil.Rocks;
 using Rest.Fody.Helpers;
-using TinyIoC;
 using SR = System.Reflection;
 
 namespace Rest.Fody.Weaving
@@ -96,7 +95,8 @@ namespace Rest.Fody.Weaving
         /// </summary>
         public void RunMethod(MethodDefinition method, MethodDefinition httpClientGetter)
         {
-            string relativePath = null;
+
+            string relativePath;
             MethodReference httpMethodGetter = null;
 
             MethodDefinition serStr = SerializeStr,
@@ -279,15 +279,24 @@ namespace Rest.Fody.Weaving
                 });
 
                 m.DeclaringType.Methods.Add(cb);
-                
-                var ctor = Module.Import(Module.ImportType(typeof(Func<,>))
-                                 .MakeGenericInstanceType(genType, returnType)
-                                 .Resolve()
-                                 .Methods.First(x => x.IsConstructor));
 
-                var continueWith = Module.Import(genType.Resolve().Methods
-                                         .First(x => x.Name == nameof(Task.ContinueWith) && x.Parameters.Count == 1 &&
-                                                     x.Parameters[0].ParameterType.Name == "Func`2"));
+                var funcType = Module.Import(Module.ImportType(typeof(Func<,>))
+                                                   .MakeGenericType(genType, returnType));
+
+                var ctor = Module.Import(typeof(Func<,>)
+                                 .GetConstructor(new[] { typeof(object), typeof(IntPtr) }));
+
+
+                MethodReference continueWith = Module
+                    .Import(typeof(Task<>)
+                    .GetMethods().First(x => x.Name == "ContinueWith"
+                                          && x.GetGenericArguments().Length == 1
+                                          && x.GetParameters().Length == 1));
+
+                ctor.DeclaringType = funcType;
+                continueWith.DeclaringType = genType;
+
+                continueWith = Module.Import(continueWith).MakeGenericMethod(returnType);
                 
                 il.Emit(OpCodes.Call, contentGetter);           // Task<HttpResponseMessage> -> Task<string> / Task<byte[]>
                 il.Emit(OpCodes.Ldarg_0);

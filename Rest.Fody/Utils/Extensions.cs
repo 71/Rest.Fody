@@ -8,21 +8,12 @@ using System.Text;
 using System.Threading.Tasks;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
-using TinyIoC;
 
 namespace Rest.Fody
 {
     internal static class Extensions
     {
-        private static TinyIoCContainer Container
-        {
-            get { return TinyIoCContainer.Current; }
-        }
-
-        private static Logger Logger
-        {
-            get { return Container.Resolve<Logger>(); }
-        }
+        private static Logger Logger => Logger.Instance;
 
         /// <summary>
         /// Returns a new <see cref="WeavingException"/>, whose <see cref="Exception.Message"/> is
