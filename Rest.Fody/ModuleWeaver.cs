@@ -69,10 +69,7 @@ namespace Rest.Fody
         public Assembly ExecutingAssembly { get; set; }
         public Assembly ReferencedAssembly { get; set; }
 
-        private TinyIoCContainer Container
-        {
-            get { return TinyIoCContainer.Current; }
-        }
+        private TinyIoCContainer Container => TinyIoCContainer.Current;
 
         public ModuleWeaver()
         {
@@ -98,52 +95,7 @@ namespace Rest.Fody
             // load logger
             Logger = new Logger(LogDebug, LogInfo);
             Container.Register(Logger);
-
-
-            // load assemblies
-            var references = References.Split(';');
-            var types = new List<Type>();
-
-            using (FileStream fs = Utils.WaitOpenFile(AssemblyFilePath, 1000))
-            {
-                byte[] data = new byte[fs.Length];
-                fs.Read(data, 0, data.Length);
-
-                ReferencedAssembly = Assembly.Load(data);
-                Container.Register(ReferencedAssembly, ReferencedAssembly.FullName);
-
-                types.AddRange(ReferencedAssembly.SafeGetTypes());
-            }
-
-            foreach (AssemblyName a in ReferencedAssembly.GetReferencedAssemblies())
-            {
-                Assembly resolved = null;
-
-                try
-                {
-                    resolved = Assembly.Load(a);
-                }
-                catch (Exception)
-                {
-                    using (FileStream fs = Utils.WaitOpenFile(references.First(x => x.Contains(a.Name)), 1000))
-                    {
-                        byte[] data = new byte[fs.Length];
-                        fs.Read(data, 0, data.Length);
-                        resolved = Assembly.Load(data);
-                    }
-                }
-                finally
-                {
-                    Logger.Log($"Loaded assembly {resolved.GetName().Name}");
-                    Container.Register(resolved, resolved.FullName);
-
-                    types.AddRange(resolved.SafeGetTypes());
-                }
-            }
-
-            Container.Register(types.ToArray());
             
-
             // registration
             Container.Register(ModuleDefinition);
 
@@ -158,10 +110,6 @@ namespace Rest.Fody
 
             Container.Register(cw);
             Container.Register(mw);
-            
-            //foreach (var t in ModuleDefinition.GetTypes()) Logger.Log("[TypeDef] " + t.FullName);
-            //foreach (var t in ModuleDefinition.GetTypeReferences()) Logger.Log("[TypeRef] " + t.FullName);
-            //foreach (var t in ModuleDefinition.GetMemberReferences()) Logger.Log("[Member] " + t.FullName);
 
 
             // options
@@ -184,12 +132,12 @@ namespace Rest.Fody
             );
 
             // stats
-            cw.RegisteredClass += (TypeDefinition t) =>
+            cw.RegisteredClass += t =>
             {
                 ModifiedTypes++;
             };
 
-            mw.RegisteredMethod += (MethodDefinition m) =>
+            mw.RegisteredMethod += m =>
             {
                 ModifiedMethods++;
             };
@@ -198,7 +146,12 @@ namespace Rest.Fody
             // actual execution
             try
             {
+#if DEBUG
+                foreach (var type in ModuleDefinition.GetTypes())
+                    cw.RunType(type);
+#else
                 Parallel.ForEach(ModuleDefinition.GetTypes(), cw.RunType);
+#endif
             }
             catch (WeavingException)
             {

@@ -103,28 +103,14 @@ namespace Rest.Fody
                 : typeRef.FullName == t.FullName;
         }
 
-        //public static Type AsType(this TypeReference type)
-        //{
-        //    string fn = Assembly.CreateQualifiedName(type.Module.Assembly.FullName, type.GetReflectionName());
-        //    return Type.GetType(fn, an => Container.Resolve<Assembly>(an.FullName), (a, s, b) => a.GetType(s, b), true);
-        //}
-
         private static string GetReflectionName(this TypeReference type)
         {
             if (type.IsGenericInstance)
             {
                 var genericInstance = (GenericInstanceType)type;
-                return string.Format("{0}.{1}[{2}]", genericInstance.Namespace, type.Name, String.Join(",", genericInstance.GenericArguments.Select(p => p.GetReflectionName()).ToArray()));
+                return String.Format("{0}.{1}[{2}]", genericInstance.Namespace, type.Name, String.Join(",", genericInstance.GenericArguments.Select(p => p.GetReflectionName()).ToArray()));
             }
             return type.FullName;
-        }
-
-        public static Type AsType(this TypeReference typeRef)
-        {
-            Type t = Container.Resolve<Type[]>().First(x => x.Name == typeRef.Name && x.Namespace == typeRef.Namespace);
-            if (typeRef is GenericInstanceType)
-                t = t.MakeGenericType(((GenericInstanceType)typeRef).GenericArguments.Select(x => x.AsType()).ToArray());
-            return t;
         }
         #endregion
 
@@ -152,18 +138,14 @@ namespace Rest.Fody
             return module.Import(typeof(T));
         }
 
+        public static TypeReference ImportType(this ModuleDefinition module, Type type)
+        {
+            return module.Import(type);
+        }
+
         public static MethodReference ImportMethod<T>(this ModuleDefinition module, string name, params Type[] paramTypes)
         {
             return module.Import(typeof(T).GetMethod(name, paramTypes));
-        }
-
-        public static MethodReference ImportContinueWith(this ModuleDefinition module, Type task, Type target)
-        {
-            return module.Import((from m in task.GetMethods()
-                                  where m.Name == "ContinueWith"
-                                  let p = m.GetParameters()
-                                  where p.Length == 1 && p[0].ParameterType.Name == "Func`2"
-                                  select m.MakeGenericMethod(target)).First());
         }
 
         public static MethodReference ImportToObservable(this ModuleDefinition module, TypeDefinition toe, TypeReference target)

@@ -152,7 +152,7 @@ namespace Rest.Fody.Weaving
             MethodDefinition deserStr, MethodDefinition deserBuf)
         {
             Logger.Log($"Generating new method {method.DeclaringType.Name}.{method.Name}", false);
-            
+
             method.Body.Emit(il =>
             {
                 if (!method.ReturnType.Is<HttpRequestMessage>())
@@ -208,22 +208,12 @@ namespace Rest.Fody.Weaving
         /// </summary>
         private void RunReturnValue(MethodDefinition m, ILProcessor il, MethodDefinition deserStr, MethodDefinition deserBuf)
         {
-            if (!m.ReturnType.Is<Task>() && !m.ReturnType.Is(typeof(IObservable<>)))
-                throw m.Message("Return type must be Task, Task<T> or IObservable<T>.");
-
-            Type returnTypeSrc;
-            TypeReference returnType;
-
-            if (m.ReturnType is GenericInstanceType)
-            {
-                returnType = (m.ReturnType as GenericInstanceType).GenericArguments[0];
-                returnTypeSrc = returnType.AsType();
-            }
-            else
-            {
-                returnType = null;
-                returnTypeSrc = null;
-            }
+            if (!m.ReturnType.Is<Task>(true)
+                && !m.ReturnType.Is(typeof(IObservable<>), true)
+                && !m.ReturnType.Is<HttpRequestMessage>())
+                throw m.Message("Return type must be HttpRequestMessage, Task, Task<T> or IObservable<T>.");
+            
+            TypeReference returnType = (m.ReturnType as GenericInstanceType)?.GenericArguments[0];
 
             if (returnType == null)
                 il.Emit(OpCodes.Nop);
@@ -242,7 +232,6 @@ namespace Rest.Fody.Weaving
                 GenericInstanceMethod deser;
                 bool isStatic;
                 GenericInstanceType genType;
-                Type genTypeSrc;
                 MethodReference resGetter;
                 MethodReference contentGetter;
 
@@ -250,7 +239,9 @@ namespace Rest.Fody.Weaving
                 {
                     deser = deserStr.MakeGenericMethod(returnType);
                     isStatic = deserStr.IsStatic;
-                    genTypeSrc = typeof(Task<string>);
+                    genType =
+                        Module.GetReference("System.Threading.Tasks.Task`1")
+                              .MakeGenericInstanceType(Module.TypeSystem.String);
                     contentGetter = Proxy_GetContentString;
                     resGetter = Module.ImportGetter<Task<string>, string>(x => x.Result);
                 }
@@ -258,16 +249,14 @@ namespace Rest.Fody.Weaving
                 {
                     deser = deserBuf.MakeGenericMethod(returnType);
                     isStatic = deserBuf.IsStatic;
-                    genTypeSrc = typeof(Task<byte[]>);
+                    genType =
+                        Module.GetReference("System.Threading.Tasks.Task`1")
+                              .MakeGenericInstanceType(Module.TypeSystem.Byte.MakeArrayType());
                     contentGetter = Proxy_GetContentByteArray;
                     resGetter = Module.ImportGetter<Task<byte[]>, byte[]>(x => x.Result);
                 }
                 else
                     throw m.Message("No serializer / deserializer found.");
-
-                genType = genTypeSrc == typeof(Task<string>)
-                    ? Module.GetReference("System.Threading.Tasks.Task`1").MakeGenericInstanceType(Module.TypeSystem.String)
-                    : Module.GetReference("System.Threading.Tasks.Task`1").MakeGenericInstanceType(Module.GetReference("System.Array").MakeGenericInstanceType(Module.TypeSystem.Byte));
 
                 MethodDefinition cb = new MethodDefinition($"${m.Name}_cb", MethodAttributes.Private, returnType);
                 cb.Parameters.Add(new ParameterDefinition(Module.Import(genType)));
@@ -290,69 +279,21 @@ namespace Rest.Fody.Weaving
                 });
 
                 m.DeclaringType.Methods.Add(cb);
+                
+                var ctor = Module.Import(Module.ImportType(typeof(Func<,>))
+                                 .MakeGenericInstanceType(genType, returnType)
+                                 .Resolve()
+                                 .Methods.First(x => x.IsConstructor));
 
-                // TODO: Replace AsType()
-                #region Unsuccesfull attemps at replacing AsType()
-                //MethodReference stuff = Module.AssemblyResolver.Resolve(Module.AssemblyReferences.First(x => x.Name == "mscorlib"))
-                //    .MainModule.GetType("System.Threading.Tasks.Task`1").Methods.First(x => x.Name == "ContinueWith" && x.);
-
-                //TypeReference st = new TypeReference("System.Threading.Tasks", "Task`1", Module, Module.AssemblyReferences.First(x => x.Name == "mscorlib"));
-                //MethodReference stuff = new MethodReference("ContinueWith", st, st);
-
-                //Logger.Log(stuff.FullName);
-                //st = Module.Import(st);
-                //stuff = Module.Import(stuff);
-                //var t0 = new GenericParameter(stuff.ReturnType);
-                //var tt0 = new GenericParameter(stuff);
-                //Logger.Log(t0.FullName + " " + t0.Type);
-                //Logger.Log(tt0.FullName + " " + tt0.Type);
-
-                //var taskType = genType;
-
-                //var func = Module.Import(typeof(Func<,>)).MakeGenericType(taskType, returnType);
-
-                //var funcCtor = new MethodReference(".ctor", Module.TypeSystem.Void, func);
-                //funcCtor.Parameters.Add(new ParameterDefinition(Module.TypeSystem.Object));
-                //funcCtor.Parameters.Add(new ParameterDefinition(Module.TypeSystem.IntPtr));
-                //funcCtor.HasThis = true;
-
-                //var continueWith = new GenericInstanceMethod(new MethodReference("ContinueWith", Module.Import(typeof(Task<>)).MakeGenericInstanceType(returnType), taskType) { HasThis = true });
-                //continueWith.GenericArguments.Add(returnType);
-                //continueWith.Parameters.Add(new ParameterDefinition(Module.Import(typeof(Func<,>)).MakeGenericType(taskType, returnType)));
-                //continueWith.GenericParameters.Add(returnType);
-
-                //il.Emit(OpCodes.Call, contentGetter);               // Task<HttpResponseMessage> -> Task<...>
-                //il.Emit(OpCodes.Ldarg_0);
-                //il.Emit(OpCodes.Ldftn, cb);                         // this.cb
-                //il.Emit(OpCodes.Newobj, funcCtor);   // new Func<Task<...>, T>(cb)
-                //il.Emit(OpCodes.Call, continueWith);
-
-                //var ctor = Module.Import(typeof(Func<,>).MakeGenericType(genType, returnTypeSrc).GetConstructors().First());
-                //var func = Module.Import(typeof(Func<,>)).MakeGenericInstanceType(genType, returnType);
-                //var ctor = new MethodReference(".ctor", Module.Import(typeof(void)), func);// Module.Import(typeof(Func<,>)).MakeGenericType(genType, returnType)
-                //                                                    //.Resolve().Methods.First(x => x.IsConstructor); // Module.ImportFuncConstructor(genType, returnType);
-                //ctor.Parameters.Add(new ParameterDefinition(Module.TypeSystem.Object));
-                //ctor.Parameters.Add(new ParameterDefinition(Module.TypeSystem.IntPtr));
-                //ctor.HasThis = true;
-                //il.Emit(OpCodes.Call, contentGetter);           // Task<HttpResponseMessage> -> Task<...>
-                //il.Emit(OpCodes.Ldarg_0);
-                //il.Emit(OpCodes.Ldftn, cb);                     // this.cb
-                //il.Emit(OpCodes.Newobj, Module.Import(ctor));   // new Func<Task<...>, T>(cb)
-                //var contWith = new GenericInstanceMethod(new MethodReference("ContinueWith", m.ReturnType, genType) { HasThis = true });
-                //contWith.Parameters.Add(new ParameterDefinition(func));
-                //contWith.GenericArguments.Add(returnType);
-                //il.Emit(OpCodes.Call, contWith); // Module.ImportContinueWith(genType, returnType)); // Module.ImportContinueWith(genType, returnTypeSrc));
-                #endregion
-
-                var ctor = Module.Import(typeof(Func<,>).MakeGenericType(genTypeSrc, returnTypeSrc).GetConstructors().First());
-
-                il.Emit(OpCodes.Dup);                           // duplicate Task<HttpResponseMessage>, in order to get value
+                var continueWith = Module.Import(genType.Resolve().Methods
+                                         .First(x => x.Name == nameof(Task.ContinueWith) && x.Parameters.Count == 1 &&
+                                                     x.Parameters[0].ParameterType.Name == "Func`2"));
+                
                 il.Emit(OpCodes.Call, contentGetter);           // Task<HttpResponseMessage> -> Task<string> / Task<byte[]>
-                il.Emit(OpCodes.Call, contentGetter);           // Task<HttpResponseMessage> -> Task<...>
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldftn, cb);                     // this.cb
                 il.Emit(OpCodes.Newobj, ctor);                  // new Func<Task<...>, T>(cb)
-                il.Emit(OpCodes.Callvirt, Module.ImportContinueWith(genTypeSrc, returnTypeSrc));
+                il.Emit(OpCodes.Callvirt, continueWith);        // task.ContinueWith(...)
             }
 
             // handle IObservable
