@@ -2,18 +2,18 @@
 A [Fody](https://github.com/Fody/Fody) addin, heavily inspired by [Refit](https://github.com/paulcbetts/refit) and [RestEase](https://github.com/canton7/RestEase).  
 Thankfully, the source code for [ReactiveUI.Fody](https://github.com/kswoll/ReactiveUI.Fody) was easy to understand, and greatly helped me.
 
+## Attention
+This project is no longer maintained, and is not expected to work.
+
 ## Basic syntax
-````csharp
+```csharp
 [ServiceFor("http://example.com/api/v2")]
 public class API
 {
     [Get("/user")]
     public extern async Task<MyUser> GetUser();
 }
-````
-
-## How-to Install
-#### `Install-Package Rest.Fody`
+```
 
 ## Source structure
 
